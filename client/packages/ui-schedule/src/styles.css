@@ -1,0 +1,34 @@
+.sc { display: flex; flex-direction: column; gap: 10px; }
+.sc__health { display: flex; flex-wrap: wrap; gap: 5px; }
+.sc__pill {
+  font-size: 10.5px; padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--border-l2); color: var(--label-tertiary); background: var(--bg-base);
+}
+.sc__pill--ok { border-color: var(--ok); color: var(--ok); }
+.sc__pill--bad { border-color: var(--danger); color: var(--danger); }
+.sc__list, .sc__actions { display: flex; }
+.sc__list { list-style: none; margin: 0; padding: 0; flex-direction: column; gap: 7px; }
+.sc__item { border: 1px solid var(--border-l1); border-radius: 9px; padding: 8px 10px; background: var(--bg-sidebar); }
+.sc__row { display: flex; align-items: baseline; gap: 7px; }
+.sc__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--nb-400); flex: none; }
+.sc__dot--active { background: var(--ok); }
+.sc__dot--paused { background: var(--warn); }
+.sc__dot--stopped { background: var(--label-caption); }
+.sc__prompt { flex: 1; font-size: 12px; color: var(--label-primary); line-height: 1.45; }
+.sc__count { font-family: var(--font-code); font-size: 10.5px; color: var(--label-caption); }
+.sc__meta { display: flex; flex-wrap: wrap; gap: 5px; margin: 5px 0 7px; }
+.sc__meta code { font-family: var(--font-code); font-size: 10px; color: var(--label-tertiary); background: var(--bg-inline-code); border-radius: 4px; padding: 1px 5px; word-break: break-all; }
+.sc__actions { gap: 6px; }
+.sc__new { border-top: 1px solid var(--border-l1); padding-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+.sc__prompt-input, .sc__spec {
+  font: inherit; font-size: 12px; padding: 6px 8px; border: 1px solid var(--border-l2);
+  border-radius: 7px; background: var(--bg-base); color: var(--label-primary);
+}
+.sc__prompt-input:focus, .sc__spec:focus { outline: none; border-color: var(--ds-400); }
+.sc__trigger { display: flex; gap: 6px; align-items: center; }
+.sc__trigger .set__select { width: auto; flex: none; }
+.sc__spec { flex: 1; font-family: var(--font-code); min-width: 90px; }
+
+/* Background-run list (`/tasks`) — definitions above, runs below. */
+.sc__jobs { margin-top: 12px; }
+.sc__jobhead { margin: 0 0 6px; font-weight: 600; }

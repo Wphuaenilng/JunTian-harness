@@ -1,0 +1,39 @@
+.tp-md { line-height: 1.62; }
+.tp-md > :first-child { margin-top: 0; }
+.tp-md > :last-child { margin-bottom: 0; }
+.tp-md pre {
+  background: var(--bg-code); border: 1px solid var(--border-l1); border-radius: 8px;
+  padding: 10px 12px; overflow: auto; font-family: var(--font-code); font-size: 12.5px;
+}
+.tp-md code { font-family: var(--font-code); background: var(--bg-inline-code); border-radius: 4px; padding: 1px 4px; font-size: 12.5px; }
+.tp-md pre code { background: none; padding: 0; }
+/* shiki runs with defaultColor:false + a dual theme, so every token arrives as
+   --shiki-light / --shiki-dark custom properties and the pick is pure CSS: a theme
+   switch repaints highlighted code without re-running shiki. Background and padding
+   stay ours (--bg-code), so a code block never brings its own colour scheme. */
+.tp-md pre.shiki { background: var(--bg-code); }
+.tp-md .shiki span { color: var(--shiki-light); }
+[data-theme='dark'] .tp-md .shiki span { color: var(--shiki-dark); }
+.tp-md ul, .tp-md ol { padding-left: 20px; }
+.tp-md blockquote { margin: 0; padding-left: 10px; border-left: 2px solid var(--nb-200); color: var(--label-secondary); }
+.tp-md table { border-collapse: collapse; font-size: 13px; }
+.tp-md th, .tp-md td { border: 1px solid var(--border-l2); padding: 4px 8px; }
+
+.tp-diff { border: 1px solid var(--border-l2); border-radius: 8px; overflow: hidden; background: var(--bg-base); }
+.tp-diff__head { display: flex; gap: 10px; padding: 5px 10px; background: var(--bg-selector); font-size: 11.5px; font-family: var(--font-code); }
+.tp-diff__add { color: var(--ok); }
+.tp-diff__del { color: var(--danger); }
+.tp-diff__body { margin: 0; padding: 8px 10px; font-family: var(--font-code); font-size: 12px; line-height: 1.5; overflow: auto; max-height: 320px; display: block; }
+.tp-diff__line { display: block; white-space: pre; }
+.tp-diff__line--add { background: rgba(34, 197, 94, .10); color: var(--ok); }
+.tp-diff__line--del { background: rgba(236, 19, 19, .08); color: var(--danger); }
+.tp-diff__line--meta { color: var(--label-caption); }
+
+.tp-term {
+  margin: 0; padding: 8px 10px; background: var(--bg-code); border-radius: 8px;
+  font-family: var(--font-code); font-size: 12px; white-space: pre-wrap; max-height: 260px; overflow: auto;
+}
+
+/* Sandboxed embedded view (MCP Apps 预留). The frame is always full-width and never
+   scrollable itself — height is negotiated over the bridge, not fought with the page. */
+.tp-app { display: block; width: 100%; border: 1px solid var(--border-l2); border-radius: 8px; background: #FFF; overflow: hidden; }

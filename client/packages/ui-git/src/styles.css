@@ -1,0 +1,57 @@
+.ckp { display: flex; flex-direction: column; gap: 8px; }
+.ckp__head { display: flex; align-items: center; justify-content: space-between; }
+.ckp__head h4 { margin: 0; font-size: 12px; letter-spacing: .3px; color: var(--label-tertiary); font-weight: 600; }
+.ckp__mini { font: inherit; font-size: 11.5px; padding: 3px 8px; border: 1px solid var(--border-l2); border-radius: 6px; background: var(--bg-base); color: var(--label-secondary); cursor: pointer; }
+.ckp__error { padding: 7px 9px; border: 1px solid var(--danger); border-radius: 8px; background: #FDECEC; font-size: 12px; color: var(--danger); }
+.ckp__empty { margin: 0; font-size: 12px; color: var(--label-caption); line-height: 1.6; }
+.ckp__empty code { font-family: var(--font-code); font-size: 11px; }
+.ckp__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ckp__item { border: 1px solid var(--border-l1); border-radius: 9px; padding: 8px 10px; background: var(--bg-sidebar); }
+.ckp__item--pending { border-color: var(--danger); }
+.ckp__meta { display: flex; gap: 10px; font-family: var(--font-code); font-size: 10.5px; color: var(--label-caption); }
+.ckp__content { margin: 5px 0 7px; font-size: 12px; color: var(--label-secondary); line-height: 1.5; white-space: pre-wrap; }
+.ckp__btn { font: inherit; font-size: 11.5px; padding: 4px 10px; border: 1px solid var(--border-l2); border-radius: 6px; background: var(--bg-base); color: var(--label-secondary); cursor: pointer; }
+.ckp__btn--danger { border-color: var(--danger); color: var(--danger); }
+.ckp__confirm { display: flex; flex-direction: column; gap: 7px; }
+.ckp__confirm label { display: flex; gap: 6px; align-items: center; font-size: 11.5px; color: var(--label-tertiary); }
+.ckp__actions { display: flex; gap: 6px; }
+
+.wb { display: flex; flex-direction: column; gap: 10px; }
+.wb__repo { display: flex; flex-direction: column; gap: 3px; }
+.wb__line { display: flex; gap: 8px; font-size: 11.5px; color: var(--label-tertiary); }
+.wb__line span { min-width: 34px; flex: none; }
+.wb__line code { font-family: var(--font-code); color: var(--label-secondary); word-break: break-all; }
+.wb__sub { margin: 4px 0 0; font-size: 11.5px; font-weight: 600; color: var(--label-tertiary); }
+.wb__changes, .wb__hist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.wb__changes { max-height: 240px; overflow: auto; }
+.wb__change {
+  display: flex; gap: 7px; align-items: baseline; width: 100%; text-align: left;
+  border: none; background: none; cursor: pointer; padding: 3px 6px; border-radius: 5px;
+  font-size: 11.5px; color: var(--label-secondary);
+}
+.wb__change:hover { background: var(--bg-hover); }
+.wb__change--on { background: var(--ds-100); }
+.wb__status { font-family: var(--font-code); font-size: 10.5px; color: var(--warn); min-width: 26px; }
+.wb__path { font-family: var(--font-code); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb__diff { border: 1px solid var(--border-l1); border-radius: 9px; padding: 8px 9px; background: var(--bg-base); }
+.wb__diff-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.wb__diff-head code { flex: 1; font-family: var(--font-code); font-size: 11px; color: var(--label-secondary); word-break: break-all; }
+.wb__stats { font-family: var(--font-code); font-size: 11px; color: var(--label-tertiary); }
+.wb__hist li { display: flex; gap: 7px; align-items: baseline; font-size: 11.5px; color: var(--label-tertiary); padding: 2px 0; }
+.wb__hist code { font-family: var(--font-code); font-size: 10.5px; color: var(--label-caption); }
+.wb__subject { flex: 1; color: var(--label-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb__when { font-size: 10.5px; color: var(--label-caption); }
+
+/* Write path. Widths are the constraint here: the rail is 320px and English labels are
+   longer than the CJK ones, so rows wrap rather than clip. */
+.wb__row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.wb__row--on { background: var(--bg-selector); border-radius: 6px; }
+.wb__change { flex: 1; min-width: 0; }
+.wb__group { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border-l1); }
+.wb__commit { display: flex; gap: 6px; align-items: center; }
+.wb__msg { flex: 1; min-width: 0; }
+.wb__hunks { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.wb__confirm { display: flex; gap: 6px; align-items: center; font-size: 11.5px; color: var(--label-tertiary); }
+.wb__ok { font-size: 11.5px; color: var(--ok); }
+.wb__code { font-family: var(--font-code); font-size: 10.5px; color: var(--label-caption); }
+.ckp__error--write { display: flex; flex-direction: column; gap: 4px; }

@@ -1,0 +1,87 @@
+/*
+ * Tokens transcribed from analysis-reports/定稿-天枢客户端方案/design/desktop-mockup-dsh-style.html
+ * (`:root` block) — the dsh light palette the design review signed off on.
+ * Change design values in the mockup first, then mirror them here; do not invent a
+ * third source of truth in components.
+ */
+:root {
+  --nb-00: #FFFFFF;
+  --nb-50: #FAFAFB;
+  --nb-60: #F5F6F7;
+  --nb-75: #F1F3F5;
+  --nb-100: #EBEEF2;
+  --nb-150: #E9ECF2;
+  --nb-200: #E1E5EE;
+  --nb-400: #ADB2B8;
+  --nb-600: #81858C;
+  --nb-700: #61666B;
+  --nb-750: #43454A;
+  --nb-1000: #0F1115;
+
+  --ds-50: #EDF3FE;
+  --ds-100: #E4EDFD;
+  --ds-200: #D3E2FF;
+  --ds-400: #679EFE;
+  --ds-500: #4176E6;
+  --blue-450: #4D93F8;
+  --green-500: #22C55E;
+  --red-600: #EC1313;
+  --amber-100: #FEF5E7;
+  --amber-400: #F7AD31;
+  --amber-500: #F59E0B;
+  --amber-600: #DD8629;
+  --violet-400: #A78BFA;
+
+  /* Semantic aliases — components consume these, never a raw ramp value. */
+  --bg-base: var(--nb-00);
+  --bg-sidebar: var(--nb-50);
+  --bg-hover: rgba(38, 49, 72, .06);
+  --bg-bubble: var(--ds-50);
+  --bg-selector: var(--nb-60);
+  --bg-code: var(--nb-50);
+  --bg-inline-code: var(--nb-100);
+  --border-l1: rgba(0, 0, 0, .04);
+  --border-l2: rgba(0, 0, 0, .10);
+  --label-primary: var(--nb-1000);
+  --label-secondary: var(--nb-700);
+  --label-tertiary: var(--nb-600);
+  --label-caption: var(--nb-400);
+  --accent: var(--ds-500);
+  --ok: var(--green-500);
+  --danger: var(--red-600);
+  --warn: var(--amber-600);
+  --shadow-lv2: 0 4px 12px 0 rgba(0, 0, 0, .02), 0 2px 8px 0 rgba(0, 0, 0, .04);
+
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-code: 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, 'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei';
+
+  /* Centered narrow column of the 定稿 layout — the document-flow reading measure. */
+  --measure: 720px;
+  --sidebar-width: 264px;
+  --statusbar-height: 28px;
+}
+
+/*
+ * Dark ramp. The mockup is light-only, so these are derived (inverted neutrals on
+ * the same blue accent) rather than signed off — treat any specific value as
+ * provisional until a dark mockup exists, and keep components off raw ramps so the
+ * whole theme can be re-sampled in one place.
+ */
+[data-theme='dark'] {
+  --bg-base: #14161A;
+  --bg-sidebar: #0F1115;
+  --bg-hover: rgba(255, 255, 255, .06);
+  --bg-bubble: #1B2330;
+  --bg-selector: #1A1D23;
+  --bg-code: #16191F;
+  --bg-inline-code: #22262E;
+  --border-l1: rgba(255, 255, 255, .06);
+  --border-l2: rgba(255, 255, 255, .14);
+  --label-primary: #F2F4F7;
+  --label-secondary: #C2C7CE;
+  --label-tertiary: #9AA0A8;
+  --label-caption: #7A8089;
+  --accent: var(--ds-400);
+  --warn: var(--amber-400);
+  --shadow-lv2: 0 4px 12px 0 rgba(0, 0, 0, .30), 0 2px 8px 0 rgba(0, 0, 0, .40);
+}

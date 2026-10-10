@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://tianshuharness.com"><b>🌐 官网</b></a> ·
-  <a href="https://atomgit.com/huiliyi37/Tianshu-harness"><b>🇨🇳 AtomGit 镜像</b></a> ·
+  <a href="https://atomgit.com/Wphuaenilng/JunTian-harness"><b>🇨🇳 AtomGit 镜像</b></a> ·
   🇨🇳 <b>中文</b> ·
   <a href="README.en.md">English</a> ·
   <a href="README.ja.md">日本語</a> ·
@@ -26,13 +26,13 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/huiliyi37/Tianshu-harness?color=8B5CF6&label=Release&logo=github&style=for-the-badge" alt="GitHub release">
+  <img src="https://img.shields.io/github/v/release/Wphuaenilng/JunTian-harness?color=8B5CF6&label=Release&logo=github&style=for-the-badge" alt="GitHub release">
   <img src="https://img.shields.io/badge/License-Apache%202.0-3B5BDB?style=for-the-badge&logo=apache" alt="License">
   <img src="https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript" alt="TypeScript">
   <img src="https://img.shields.io/badge/Tests-19%2C000%2B%20Passed-green?style=for-the-badge&logo=testinglibrary" alt="Tests">
   <a href="https://discord.gg/XjWTATCHB"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://atomgit.com/huiliyi37/Tianshu-harness"><img src="https://atomgit.com/huiliyi37/Tianshu-harness/star/badge.svg" alt="AtomGit Star"></a>
-  <a href="https://github.com/huiliyi37/Tianshu-harness/releases"><img src="https://img.shields.io/github/downloads/huiliyi37/Tianshu-harness/total?logo=github&label=downloads" alt="GitHub downloads"></a>
+  <a href="https://atomgit.com/Wphuaenilng/JunTian-harness"><img src="https://atomgit.com/Wphuaenilng/JunTian-harness/star/badge.svg" alt="AtomGit Star"></a>
+  <a href="https://github.com/Wphuaenilng/JunTian-harness/releases"><img src="https://img.shields.io/github/downloads/Wphuaenilng/JunTian-harness/total?logo=github&label=downloads" alt="GitHub downloads"></a>
   <a href="https://www.npmjs.com/package/tianshu-tui"><img src="https://img.shields.io/npm/dm/tianshu-tui?label=npm%20tianshu-tui" alt="npm tianshu-tui downloads"></a>
   <a href="https://www.npmjs.com/package/tianshu-harness"><img src="https://img.shields.io/npm/dm/tianshu-harness?label=npm%20tianshu-harness" alt="npm tianshu-harness downloads"></a>
 </p>
@@ -91,7 +91,7 @@ Application / TUI / IDE / Desktop
 
 ### 桌面端
 
-安装包在 [GitHub Releases](https://github.com/huiliyi37/Tianshu-harness/releases/latest)。macOS、Windows、Linux 用的是同一个 agent 内核。
+安装包在 [GitHub Releases](https://github.com/Wphuaenilng/JunTian-harness/releases/latest)。macOS、Windows、Linux 用的是同一个 agent 内核。
 
 **macOS**（11 及以上，Apple Silicon 与 Intel 各一包）
 
@@ -131,10 +131,10 @@ chmod +x Tianshu_*.AppImage
 
 ```bash
 # macOS / Linux
-bash <(curl -fsSL https://raw.githubusercontent.com/huiliyi37/Tianshu-harness/main/scripts/install-tui.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/Wphuaenilng/JunTian-harness/main/scripts/install-tui.sh)
 
 # Windows（PowerShell）
-powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/huiliyi37/Tianshu-harness/main/scripts/install-tui.ps1 | iex"
+powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Wphuaenilng/JunTian-harness/main/scripts/install-tui.ps1 | iex"
 
 # 或 npm
 npm install -g tianshu-harness
@@ -380,13 +380,13 @@ node dist/cli/entry.js
 - **破坏性命令门禁** —— `rm -rf`、force push、`DROP/TRUNCATE` 需显式确认
 - **检查点 + 文件级撤销** —— 每回合首次修改前创建 Git 检查点；每次写/编辑前版本化备份
 
-安全漏洞请走 [私密报告](https://github.com/huiliyi37/Tianshu-harness/security/advisories/new)，不要开公开 issue。
+安全漏洞请走 [私密报告](https://github.com/Wphuaenilng/JunTian-harness/security/advisories/new)，不要开公开 issue。
 
 ## 🤝 社区与支持
 
-- **使用问题 / 讨论** → [GitHub Discussions](https://github.com/huiliyi37/Tianshu-harness/discussions)
+- **使用问题 / 讨论** → [GitHub Discussions](https://github.com/Wphuaenilng/JunTian-harness/discussions)
 - **Discord 交流群** → [加入「天枢 tianshu-harness 官方交流群」](https://discord.gg/XjWTATCHB)（邀请链接，不受 7 天限制）
-- **Bug 报告 / 功能请求** → [GitHub Issues](https://github.com/huiliyi37/Tianshu-harness/issues)（附 `tianshu logs --json` 输出可加速定位）
+- **Bug 报告 / 功能请求** → [GitHub Issues](https://github.com/Wphuaenilng/JunTian-harness/issues)（附 `tianshu logs --json` 输出可加速定位）
 - **贡献代码** → [CONTRIBUTING.md](CONTRIBUTING.md) · **求助指南** → [SUPPORT.md](SUPPORT.md)
 - **微信交流群** → 「天枢 harness 交流群5群」，扫码加入（二维码 7 天有效，过期请在 Discussions 留言补码）：
 
@@ -427,11 +427,11 @@ node dist/cli/entry.js
 
 ## ⭐ Star History
 
-<a href="https://star-history.com/#huiliyi37/tianshu-harness&Date">
+<a href="https://star-history.com/#Wphuaenilng/JunTian-harness&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=huiliyi37/tianshu-harness&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=huiliyi37/tianshu-harness&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=huiliyi37/tianshu-harness&type=Date" width="700" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Wphuaenilng/JunTian-harness&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Wphuaenilng/JunTian-harness&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Wphuaenilng/JunTian-harness&type=Date" width="700" />
   </picture>
 </a>
 

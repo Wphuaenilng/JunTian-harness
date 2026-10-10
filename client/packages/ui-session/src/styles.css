@@ -1,0 +1,38 @@
+.us { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg-sidebar); border-right: 1px solid var(--border-l1); }
+.us__brand { padding: 14px 16px 10px; display: flex; align-items: baseline; gap: 8px; }
+.us__brand b { font-size: 15px; letter-spacing: .2px; color: var(--label-primary); }
+.us__brand span { font-size: 11px; color: var(--label-tertiary); }
+.us__new { margin: 0 12px 12px; padding: 8px 10px; border: none; border-radius: 8px; background: var(--nb-1000); color: #fff; font: inherit; font-size: 13px; cursor: pointer; }
+.us__filter { display: flex; align-items: center; gap: 6px; margin: 0 14px 8px; font-size: 11.5px; color: var(--label-tertiary); cursor: pointer; }
+.us__filter input { accent-color: var(--accent); margin: 0; }
+.us__list { flex: 1; overflow: auto; padding: 0 8px; }
+.us__row { padding: 8px 9px; border-radius: 8px; cursor: pointer; margin-bottom: 2px; }
+.us__row:hover { background: var(--bg-hover); }
+.us__row--sel { background: var(--ds-100); }
+.us__title { font-size: 13px; font-weight: 600; color: var(--label-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.us__meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--label-tertiary); margin-top: 2px; }
+.us__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--nb-400); }
+.us__dot--running { background: var(--accent); }
+.us__dot--completed { background: var(--ok); }
+.us__dot--failed, .us__dot--interrupted { background: var(--danger); }
+.us__badge { color: var(--warn); }
+.us__branch { font-family: var(--font-code); color: var(--label-caption); }
+.us__search {
+  margin: 0 12px 8px; padding: 6px 9px; font: inherit; font-size: 12px;
+  border: 1px solid var(--border-l2); border-radius: 7px; background: var(--bg-base); color: var(--label-primary);
+}
+.us__search:focus { outline: none; border-color: var(--ds-400); }
+.us__snippet {
+  font-size: 11.5px; color: var(--label-tertiary); margin-top: 2px; line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.us__rename {
+  margin-left: auto; border: none; background: none; color: var(--label-caption);
+  cursor: pointer; font-size: 11px; padding: 0 2px; opacity: 0;
+}
+.us__row:hover .us__rename { opacity: 1; }
+/* The archive button was the old margin-left:auto target; with rename present the
+   first of the two owns the push. */
+.us__meta .us__rename ~ .us__archive { margin-left: 2px; }
+.us__row:hover .us__archive { opacity: 1; }
+.us__empty { padding: 12px; font-size: 12px; color: var(--label-caption); }

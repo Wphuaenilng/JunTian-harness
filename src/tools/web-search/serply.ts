@@ -35,7 +35,7 @@ export class SerplyBackend implements SearchBackend {
       headers: {
         Accept: 'application/json',
         'X-Api-Key': this.apiKey ?? '',
-        'User-Agent': 'Tianshu (+https://github.com/huiliyi37/Tianshu-harness)',
+        'User-Agent': 'Tianshu (+https://github.com/Wphuaenilng/JunTian-harness)',
       },
     })
     if (!response.ok) {

@@ -1,0 +1,11 @@
+{
+  "name": "@tianshu/ui-theme",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CSS token layer and theme boot script. Design values lifted verbatim from the approved mockup so UI and design cannot drift.",
+  "exports": {
+    "./tokens.css": "./src/tokens.css",
+    ".": "./src/index.ts"
+  }
+}

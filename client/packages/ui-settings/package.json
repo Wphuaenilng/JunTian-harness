@@ -1,0 +1,18 @@
+{
+  "name": "@tianshu/ui-settings",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Settings center: approval mode as a permission set, default model, providers and key slots. Talks only to client-core services.",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./styles.css": "./src/styles.css"
+  },
+  "dependencies": {
+    "@tianshu/client-core": "workspace:*",
+    "@tianshu/locale": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}

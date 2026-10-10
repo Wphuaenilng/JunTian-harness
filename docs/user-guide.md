@@ -19,7 +19,7 @@ npm install -g tianshu-harness
 tianshu
 ```
 
-首次运行会先进入主界面，再自动打开 `/connect` 向导——在那里选择服务商并完成认证。桌面端从 [GitHub Releases](https://github.com/huiliyi37/Tianshu-harness/releases/latest) 下载（macOS `.dmg` · Windows `.exe` · Linux `.AppImage`），也可在 Settings → Provider 管理配置。
+首次运行会先进入主界面，再自动打开 `/connect` 向导——在那里选择服务商并完成认证。桌面端从 [GitHub Releases](https://github.com/Wphuaenilng/JunTian-harness/releases/latest) 下载（macOS `.dmg` · Windows `.exe` · Linux `.AppImage`），也可在 Settings → Provider 管理配置。
 
 要求 Node.js ≥ 24。一键脚本、源码构建、Android/Termux、Shell 补全、各平台注意事项与自动更新见 [安装与平台说明](guides/installation.md)。
 

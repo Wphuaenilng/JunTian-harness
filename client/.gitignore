@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.sidecar-info.json
+.sidecar-data/
+.sidecar.log
+*.tsbuildinfo
+# Redirected serve/boot output from manual runs: ports and pid chatter, but a log is
+# never something to commit.
+*.log
+
+# Desktop shell state: its own sidecar store + info/log live here, and they hold a
+# bearer token. Packaged output goes to release/.
+apps/desktop/.runtime/
+apps/desktop/release/
+
+# Scratch stores for the two keyless harnesses. A hard Ctrl-C can leave them behind,
+# and they contain a live session dir plus a token-bearing info file.
+.ci-smoke/
+.stall-demo/
+
+# Runtime skills the kernel plants into the session cwd — not source.
+.rivet/

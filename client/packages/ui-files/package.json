@@ -1,0 +1,19 @@
+{
+  "name": "@tianshu/ui-files",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Workspace file browser and preview, backed by the session's files / list-dir / file-content endpoints.",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./styles.css": "./src/styles.css"
+  },
+  "dependencies": {
+    "@tianshu/client-core": "workspace:*",
+    "@tianshu/locale": "workspace:*",
+    "@tianshu/ui-primitives": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}

@@ -5,7 +5,7 @@ import { useI18n } from '@/composables/useI18n'
 const { t } = useI18n()
 
 const stats = [
-  { icon: Github, label: t('trust.prefix_cache'), value: '95-99%', href: 'https://github.com/huiliyi37/Tianshu-Tui' },
+  { icon: Github, label: t('trust.prefix_cache'), value: '95-99%', href: 'https://github.com/Wphuaenilng/JunTian-harness' },
   { icon: Scale, label: t('trust.opensource'), value: 'Apache-2.0' },
   { icon: TestTube, label: t('trust.tools'), value: '20+' },
   { icon: GitBranch, label: 'Version', value: 'v2.17.4' },

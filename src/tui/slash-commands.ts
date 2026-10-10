@@ -1170,7 +1170,7 @@ const TUI_SLASH_COMMANDS: readonly TuiSlashCommandDef[] = [
       for (const l of formatTlsTrustLines(detectTlsInterception())) lines.push(l)
 
       const guidance = formatEnvGuidance(env)
-      const footer = '更多排障：/logs（本会话日志落点）· 排障手册 github.com/huiliyi37/Tianshu-Tui/blob/main/docs/guides/troubleshooting.md'
+      const footer = '更多排障：/logs（本会话日志落点）· 排障手册 github.com/Wphuaenilng/JunTian-harness/blob/main/docs/guides/troubleshooting.md'
       pushStatic(createLogEntry({ type: 'system', content: lines.join('\n') + (guidance ? '\n\n' + guidance : '') + '\n\n' + footer }))
       setIsStreaming(false)
       return true

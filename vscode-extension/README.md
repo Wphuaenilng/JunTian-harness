@@ -48,4 +48,4 @@ VS Code / Cursor 扩展宿主
 
 ## 许可
 
-Apache 2.0 · 源码见 [GitHub](https://github.com/huiliyi37/Tianshu-Tui)
+Apache 2.0 · 源码见 [GitHub](https://github.com/Wphuaenilng/JunTian-harness)

@@ -1,0 +1,17 @@
+{
+  "name": "@tianshu/ui-session",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Session list, create, archive. Subscribes to the lifecycle category only.",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./styles.css": "./src/styles.css"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  },
+  "dependencies": {
+    "@tianshu/locale": "workspace:*"
+  }
+}

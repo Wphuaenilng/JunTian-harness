@@ -124,7 +124,7 @@ related: [../reference/observability-harness.md, ../user-guide-sandbox-permissio
 
 ## 9. Windows 特有问题
 
-**现象 A：提示 WebView2 运行时过旧、会话区滚动卡顿。** 界面渲染依赖 WebView2 Runtime（建议 ≥ 120）。在提示条或「设置 → 运行时与关于」里点「运行修复工具」；窗口完全打不开时，用开始菜单「修复 WebView2」，或从 [Releases](https://github.com/huiliyi37/Tianshu-harness/releases/latest) 下载 `windows-repair` 目录运行 `repair-webview2.cmd`；也可手动安装 WebView2 离线安装包后重启。
+**现象 A：提示 WebView2 运行时过旧、会话区滚动卡顿。** 界面渲染依赖 WebView2 Runtime（建议 ≥ 120）。在提示条或「设置 → 运行时与关于」里点「运行修复工具」；窗口完全打不开时，用开始菜单「修复 WebView2」，或从 [Releases](https://github.com/Wphuaenilng/JunTian-harness/releases/latest) 下载 `windows-repair` 目录运行 `repair-webview2.cmd`；也可手动安装 WebView2 离线安装包后重启。
 
 **现象 B：shell 命令执行异常。** 桌面版安装包内嵌 PortableGit（完整 Git + Git Bash，开箱即用，不依赖自装 Git；已装系统 Git 时优先用系统版）。CLI 用户自装 Git for Windows 即可获得可靠的 POSIX 命令执行——`/doctor` 会告诉你 bash 工具实际用的是哪个 shell，未用 Git Bash 时会给出警告。
 
@@ -234,6 +234,6 @@ npm error Error: EACCES: permission denied, mkdir '/usr/local/lib/node_modules/t
 
 在终端跑 `rivet logs --json`，把输出的结构化落点清单贴进 issue——它列出所有会话/日志文件的实际路径与写入门控，维护者能据此快速定位。
 
-- Bug 报告 / 功能请求 → [GitHub Issues](https://github.com/huiliyi37/Tianshu-harness/issues)
-- 使用问题 / 讨论 → [GitHub Discussions](https://github.com/huiliyi37/Tianshu-harness/discussions)
-- 安全漏洞 → 走[私密报告](https://github.com/huiliyi37/Tianshu-harness/security/advisories/new)，不要开公开 issue
+- Bug 报告 / 功能请求 → [GitHub Issues](https://github.com/Wphuaenilng/JunTian-harness/issues)
+- 使用问题 / 讨论 → [GitHub Discussions](https://github.com/Wphuaenilng/JunTian-harness/discussions)
+- 安全漏洞 → 走[私密报告](https://github.com/Wphuaenilng/JunTian-harness/security/advisories/new)，不要开公开 issue

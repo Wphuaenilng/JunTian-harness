@@ -1,0 +1,14 @@
+{
+  "name": "@tianshu/client-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The only place this client speaks the Tianshu sidecar protocol: REST + SSE, connection generations, seq dedupe/reconnect, 56-event → 5-category adapter, generated protocol mirror.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test src/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "types": ["vite/client"],
+    "baseUrl": "../..",
+    "paths": {
+      "@tianshu/client-core": ["packages/client-core/src/index.ts"],
+      "@tianshu/store": ["packages/store/src/index.ts"],
+      "@tianshu/locale": ["packages/locale/src/index.ts"],
+      "@tianshu/locale/*": ["packages/locale/src/*"],
+      "@tianshu/ui-theme": ["packages/ui-theme/src/index.ts"],
+      "@tianshu/ui-theme/*": ["packages/ui-theme/src/*"],
+      "@tianshu/ui-primitives": ["packages/ui-primitives/src/index.ts"],
+      "@tianshu/ui-primitives/*": ["packages/ui-primitives/src/*"],
+      "@tianshu/ui-session": ["packages/ui-session/src/index.tsx"],
+      "@tianshu/ui-chat": ["packages/ui-chat/src/index.tsx"],
+      "@tianshu/ui-approval": ["packages/ui-approval/src/index.tsx"],
+      "@tianshu/ui-settings": ["packages/ui-settings/src/index.tsx"],
+      "@tianshu/ui-git": ["packages/ui-git/src/index.tsx"],
+      "@tianshu/ui-files": ["packages/ui-files/src/index.tsx"],
+      "@tianshu/ui-schedule": ["packages/ui-schedule/src/index.tsx"]
+    }
+  },
+  "include": ["src/**/*.tsx", "src/**/*.ts", "../../packages/*/src/**/*.ts", "../../packages/*/src/**/*.tsx"]
+}

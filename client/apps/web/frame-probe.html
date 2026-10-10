@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Tianshu frame probe</title>
+</head>
+<body>
+  <!-- Developer page, not product surface: it mounts the real <AppFrame> and drives it
+       with an adversarial document so the sandbox claims are measured, not asserted.
+       Built as a second vite input; nothing links to it. -->
+  <div id="root"></div>
+  <pre id="out">running…</pre>
+  <script type="module" src="/src/frame-probe.tsx"></script>
+</body>
+</html>

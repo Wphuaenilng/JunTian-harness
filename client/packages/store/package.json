@@ -1,0 +1,12 @@
+{
+  "name": "@tianshu/store",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "View-state store only (zustand/vanilla + immer). Business data lives in client-core's React-free Session layer — never here.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "immer": "^10.1.1",
+    "zustand": "^5.0.2"
+  }
+}

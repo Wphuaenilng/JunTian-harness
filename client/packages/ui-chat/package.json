@@ -1,0 +1,19 @@
+{
+  "name": "@tianshu/ui-chat",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Conversation stream: block timeline, thinking collapse, tool cards with diff, composer with busy→queue fallback.",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./styles.css": "./src/styles.css"
+  },
+  "dependencies": {
+    "@tianshu/client-core": "workspace:*",
+    "@tianshu/locale": "workspace:*",
+    "@tianshu/ui-primitives": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}

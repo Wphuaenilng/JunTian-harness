@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>天枢 · M0 spike</title>
+<style>
+  /* Tokens lifted from the 定稿 mockup (design/desktop-mockup-dsh-style.html) so the
+     spike and the approved design cannot drift apart while M1 is being wired. */
+  :root{
+    --nb-00:#FFFFFF; --nb-50:#FAFAFB; --nb-60:#F5F6F7; --nb-75:#F1F3F5;
+    --nb-100:#EBEEF2; --nb-150:#E9ECF2; --nb-200:#E1E5EE;
+    --nb-400:#ADB2B8; --nb-600:#81858C; --nb-700:#61666B; --nb-750:#43454A;
+    --nb-1000:#0F1115;
+    --ds-50:#EDF3FE; --ds-100:#E4EDFD; --ds-200:#D3E2FF; --ds-400:#679EFE; --ds-500:#4176E6;
+    --green-500:#22C55E; --red-600:#EC1313;
+    --amber-100:#FEF5E7; --amber-400:#F7AD31; --amber-600:#DD8629;
+    --violet-400:#A78BFA;
+    --border-l1:rgba(0,0,0,.04); --border-l2:rgba(0,0,0,.10);
+    --hover:rgba(38,49,72,.06);
+    --font:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei','Helvetica Neue',Helvetica,Arial,sans-serif;
+    --font-code:'SF Mono','JetBrains Mono','Fira Code',Consolas,'Liberation Mono',Menlo,Courier;
+    --shadow-lv2:0 4px 12px 0 rgba(0,0,0,.02),0 2px 8px 0 rgba(0,0,0,.04);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--font);color:var(--nb-1000);background:var(--nb-00);
+       height:100vh;display:grid;grid-template-columns:264px 1fr;grid-template-rows:1fr 28px;font-size:14px}
+  aside{grid-row:1/3;background:var(--nb-50);border-right:1px solid var(--border-l1);display:flex;flex-direction:column;min-height:0}
+  .brand{padding:14px 16px 10px;display:flex;align-items:baseline;gap:8px}
+  .brand b{font-size:15px;letter-spacing:.2px}
+  .brand span{font-size:11px;color:var(--nb-600)}
+  .new{margin:0 12px 12px;display:flex;flex-direction:column;gap:6px}
+  .new input{font:inherit;font-size:12px;padding:7px 9px;border:1px solid var(--border-l2);border-radius:7px;background:var(--nb-00);color:var(--nb-750)}
+  button{font:inherit;cursor:pointer;border-radius:7px;border:1px solid var(--border-l2);background:var(--nb-00);color:var(--nb-750);padding:7px 10px}
+  button.primary{background:var(--nb-1000);color:#fff;border-color:var(--nb-1000)}
+  button.ghost{border-color:transparent;background:transparent}
+  .sessions{overflow:auto;flex:1;padding:0 8px}
+  .sess{padding:8px 9px;border-radius:8px;cursor:pointer;margin-bottom:2px}
+  .sess:hover{background:var(--hover)}
+  .sess.sel{background:var(--ds-100)}
+  .sess b{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sess i{font-style:normal;font-size:11px;color:var(--nb-600)}
+  main{display:flex;flex-direction:column;min-width:0;min-height:0}
+  .stream{flex:1;overflow:auto;padding:22px 0 8px;display:flex;justify-content:center}
+  .col{width:100%;max-width:720px}
+  .row{margin:0 0 12px}
+  .user{background:var(--ds-50);border:1px solid var(--ds-200);border-radius:10px;padding:10px 12px;white-space:pre-wrap}
+  .text{line-height:1.62;white-space:pre-wrap}
+  .think{border-left:2px solid var(--nb-200);padding:4px 10px;color:var(--nb-700);font-size:13px;white-space:pre-wrap}
+  .think>summary{cursor:pointer;color:var(--nb-600);font-size:12px;list-style:none}
+  .tool{border:1px solid var(--border-l2);border-radius:9px;background:var(--nb-50);padding:8px 10px;box-shadow:var(--shadow-lv2)}
+  .tool b{font-size:12.5px}
+  .tool pre{margin:6px 0 0;font-family:var(--font-code);font-size:11.5px;color:var(--nb-700);white-space:pre-wrap;max-height:180px;overflow:auto}
+  .err{color:var(--red-600);font-size:12.5px}
+  .ap{border:1px solid var(--amber-400);background:var(--amber-100);border-radius:11px;padding:11px 12px;margin-bottom:12px}
+  .ap.stalled{border-color:var(--red-600);background:#FDECEC}
+  .ap h4{margin:0 0 3px;font-size:13px}
+  .ap p{margin:0 0 9px;font-size:12px;color:var(--nb-700);font-family:var(--font-code);white-space:pre-wrap}
+  .ap .act{display:flex;gap:7px;flex-wrap:wrap}
+  .warn{font-size:11.5px;color:var(--amber-600);margin:0 0 7px}
+  footer{grid-column:1/3;border-top:1px solid var(--border-l1);background:var(--nb-50);
+         display:flex;align-items:center;gap:14px;padding:0 14px;font-size:11.5px;color:var(--nb-600)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--nb-400);display:inline-block;margin-right:5px}
+  .dot.live{background:var(--green-500)}.dot.replay{background:var(--ds-400)}.dot.down{background:var(--red-600)}.dot.connecting{background:var(--amber-400)}
+  .composer{border-top:1px solid var(--border-l1);padding:10px 0 12px;display:flex;justify-content:center;background:var(--nb-00)}
+  .composer .col{display:flex;gap:8px;align-items:flex-end}
+  textarea{flex:1;font:inherit;resize:none;border:1px solid var(--border-l2);border-radius:10px;padding:9px 11px;max-height:140px;background:var(--nb-00)}
+  textarea:focus{outline:none;border-color:var(--ds-400)}
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand"><b>天枢</b><span>M0 spike</span></div>
+  <div class="new">
+    <input id="cwd" placeholder="工作目录 cwd" value="">
+    <button class="primary" id="create">新建会话</button>
+  </div>
+  <div class="sessions" id="sessions"></div>
+</aside>
+
+<main>
+  <div class="stream" id="stream"><div class="col" id="col"></div></div>
+  <div class="composer"><div class="col">
+    <textarea id="input" rows="1" placeholder="给天枢发消息…（Enter 发送，Shift+Enter 换行）"></textarea>
+    <button id="send" class="primary">发送</button>
+    <button id="abort" class="ghost">中止</button>
+  </div></div>
+</main>
+
+<footer>
+  <span><span class="dot" id="dot"></span><span id="phase">idle</span></span>
+  <span>gen <b id="gen">0</b></span>
+  <span>seq <b id="seq">0</b></span>
+  <span id="counts">lifecycle 0 · text 0 · tool 0 · state 0 · custom 0</span>
+  <span id="rtm"></span>
+</footer>
+
+<script>
+const API = '/api';
+const state = { sessionId: null, generation: 0, lastSeq: 0, close: null, approvals: new Map(), timers: new Map(), counts: {lifecycle:0,text:0,tool:0,state:0,custom:0} };
+const $ = (id) => document.getElementById(id);
+const col = () => $('col');
+
+// Mirror of client-core's rules, inline because a spike has no bundler. M1 apps/web
+// imports @tianshu/client-core instead of restating these.
+const CATEGORY = {
+  lifecycle:['phase','done','status','error','turn_complete','approval_required','approval_resolved','approval_snapshot','retry','watchdog_recovery','resume_offer','recovery_status','unattended_halt','autonomy_checkpoint','landing','handoff_archived','replay_window'],
+  text:['text_delta','thinking_delta','user','intent_note'],
+  tool:['tool_use','tool_result','artifact','tool_delegate','delegation','delegation_snapshot','job','job_snapshot','hook_result'],
+  state:['todo_state','context_budget','plan_mode','plan_submitted','plan_draft','plan_auto_approve_pending','plan_auto_approve_cancelled','ask_mode','steer_queued','steer_delivered','queue_pending','queue_status','goal_state','goal_rollover','decision_shift','checkpoint','rewind','fork'],
+};
+const CAT = {}; for (const k in CATEGORY) for (const t of CATEGORY[k]) CAT[t] = k;
+const categoryOf = (t) => CAT[t] ?? 'custom';
+const accept = (seq, last) => seq === 0 ? 'meta' : (seq > last ? 'next' : 'dup');
+
+async function api(path, init) {
+  const res = await fetch(API + path, init);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) { const e = new Error(body.error || (res.status + ' ' + path)); e.status = res.status; throw e; }
+  return body;
+}
+const post = (path, obj) => api(path, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(obj ?? {}) });
+
+function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+function node(tag, cls, text) { const n = el(tag, cls, text); col().appendChild(n); $('stream').scrollTop = $('stream').scrollHeight; return n; }
+
+async function loadSessions() {
+  const list = await api('/sessions');
+  const box = $('sessions'); box.innerHTML = '';
+  for (const s of list.sessions.filter(x => !x.archived)) {
+    const n = el('div', 'sess' + (s.id === state.sessionId ? ' sel' : ''));
+    n.appendChild(el('b', null, s.title || s.id.slice(0, 12)));
+    n.appendChild(el('i', null, `${s.status} · seq ${s.lastSeq}${s.pendingApprovals ? ' · ⚠' + s.pendingApprovals : ''}`));
+    n.onclick = () => open(s.id);
+    box.appendChild(n);
+  }
+}
+
+function resetView() {
+  col().innerHTML = '';
+  Object.assign(state.counts, {lifecycle:0,text:0,tool:0,state:0,custom:0});
+  state.timers.forEach(t => clearTimeout(t)); state.timers.clear(); state.approvals.clear();
+}
+
+function setPhase(p) {
+  $('phase').textContent = p;
+  $('dot').className = 'dot ' + p;
+}
+
+async function open(id) {
+  if (state.close) state.close();
+  state.sessionId = id; state.lastSeq = 0; state.generation = 0;
+  resetView(); loadSessions();
+  const ac = new AbortController();
+  state.close = () => ac.abort();
+  void stream(id, ac.signal);
+  // Cold-start approvals: pending state survives the event ring, so REST is the
+  // authority here, not the stream (approval-routes.ts:10).
+  try { const snap = await api(`/sessions/${id}/interventions`); for (const a of snap.approvals) showApproval(a); } catch {}
+}
+
+async function stream(id, signal) {
+  while (!signal.aborted) {
+    state.generation += 1;
+    const gen = state.generation;
+    $('gen').textContent = gen;
+    setPhase('connecting');
+    // New generation ⇒ partial renders under the old one are void (§4.3 #1).
+    let phase = 'replay';
+    try {
+      const res = await fetch(`${API}/sessions/${id}/stream?since=${state.lastSeq}`, { signal });
+      if (!res.ok || !res.body) throw new Error('stream ' + res.status);
+      setPhase('replay');
+      const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf('\n\n')) >= 0) {
+          const frame = buf.slice(0, i); buf = buf.slice(i + 2);
+          const data = frame.split('\n').filter(l => l.startsWith('data:')).map(l => l.slice(5).trimStart()).join('\n');
+          if (!data) continue;
+          let ev; try { ev = JSON.parse(data); } catch { continue; }
+          if (typeof ev.seq !== 'number' || typeof ev.type !== 'string') continue;
+          const kind = accept(ev.seq, state.lastSeq);
+          if (kind === 'dup') continue;
+          if (kind === 'next') { state.lastSeq = ev.seq; $('seq').textContent = ev.seq; }
+          if (ev.type === 'approval_snapshot' && ev.seq === 0 && phase === 'replay') { phase = 'live'; setPhase('live'); }
+          handle(ev, phase);
+        }
+      }
+    } catch { if (signal.aborted) return; }
+    if (signal.aborted) return;
+    setPhase('down');
+    await new Promise(r => setTimeout(r, Math.random() * 2000 + 300));
+  }
+}
+
+let textTail = null, thinkTail = null;
+function handle(ev, phase) {
+  const c = categoryOf(ev.type);
+  state.counts[c]++; $('counts').textContent = Object.entries(state.counts).map(([k,v]) => `${k} ${v}`).join(' · ');
+  const d = ev.data ?? {};
+  switch (ev.type) {
+    case 'user': textTail = thinkTail = null; node('div','row').appendChild(el('div','user', d.text ?? '')); break;
+    case 'text_delta': {
+      if (!textTail) textTail = node('div','row').appendChild(el('div','text',''));
+      textTail.textContent += d.text ?? d.delta ?? '';
+      if (phase === 'live') $('rtm').textContent = 'streaming';
+      break;
+    }
+    case 'thinking_delta': {
+      if (!thinkTail) { const d2 = node('details','row think'); d2.appendChild(el('summary',null,'思考中…')); thinkTail = d2.appendChild(el('div',null,'')); }
+      thinkTail.textContent += d.text ?? d.delta ?? '';
+      break;
+    }
+    case 'tool_use': { textTail = thinkTail = null;
+      const t = node('div','row tool');
+      t.appendChild(el('b',null,'🔧 ' + (d.name ?? d.toolName ?? 'tool')));
+      t.appendChild(el('pre',null, JSON.stringify(d.input ?? d.args ?? {}, null, 2).slice(0, 1200)));
+      break; }
+    case 'tool_result': { textTail = thinkTail = null;
+      const t = node('div','row tool');
+      t.appendChild(el('b',null,'✓ 工具结果' + (d.isError ? '（错误）' : '')));
+      t.appendChild(el('pre',null, String(d.content ?? d.result ?? '').slice(0, 1200)));
+      break; }
+    case 'approval_required': textTail = thinkTail = null; showApproval(d.approval ?? d); break;
+    case 'approval_resolved': case 'approval_snapshot':
+      if (ev.type === 'approval_resolved') hideApproval(d.requestId);
+      else { state.approvals.forEach((n, k) => { if (!d.approvals?.some(a => a.requestId === k)) hideApproval(k); });
+             for (const a of (d.approvals ?? [])) showApproval(a); }
+      break;
+    case 'turn_complete': textTail = thinkTail = null; $('rtm').textContent = '';
+      node('div','row').appendChild(el('i',null, `— turn ${d.numTurns ?? d.turns ?? ''} 完成${d.stopReason === 'max_tokens' ? '（被 max_tokens 截断，发「继续」可续）' : ''} —`));
+      loadSessions(); break;
+    case 'done': textTail = thinkTail = null; $('rtm').textContent = 'run done'; loadSessions(); break;
+    case 'error': textTail = thinkTail = null; node('div','row err', '错误：' + (d.error ?? JSON.stringify(d))); break;
+    case 'status': $('rtm').textContent = d.message ?? d.phase ?? 'status'; break;
+    default: break; // every other event is accounted for by category and rendered in M1
+  }
+}
+
+function showApproval(a) {
+  if (!a?.requestId || state.approvals.has(a.requestId)) return;
+  const box = el('div','ap');
+  box.appendChild(el('h4',null, `需要授权：${a.toolName ?? '工具'}`));
+  box.appendChild(el('p',null, JSON.stringify(a.input ?? {}, null, 2).slice(0, 800)));
+  const warn = el('p','warn',''); warn.style.display='none'; box.appendChild(warn);
+  const act = el('div','act');
+  const mk = (label, cls, body) => {
+    const b = el('button', cls); b.textContent = label;
+    b.onclick = async () => {
+      try { await post(`/sessions/${state.sessionId}/interventions/${encodeURIComponent(a.requestId)}/answer`, body); hideApproval(a.requestId); }
+      catch (e) { warn.style.display=''; warn.textContent = '回执失败：' + e.message; }
+    };
+    act.appendChild(b);
+  };
+  // Three states per plan §2.3 — "always" is the sidecar's `remember` flag.
+  mk('允许一次','primary',{ decision:'approve' });
+  mk('始终允许','',{ decision:'approve', remember:true });
+  mk('拒绝','',{ decision:'deny' });
+  box.appendChild(act);
+  col().prepend(box);
+  state.approvals.set(a.requestId, box);
+  // A silently pending approval is a hung session (OpenCode #16367) — never wait quietly.
+  state.timers.set(a.requestId, setTimeout(() => {
+    box.classList.add('stalled');
+    warn.style.display = ''; warn.textContent = '已等待超过 30 秒 —— 这个会话正卡在授权上。';
+  }, 30000));
+}
+function hideApproval(id) {
+  const n = state.approvals.get(id); if (n) n.remove();
+  state.approvals.delete(id);
+  const t = state.timers.get(id); if (t) clearTimeout(t); state.timers.delete(id);
+}
+
+$('create').onclick = async () => {
+  const cwd = $('cwd').value.trim();
+  try { const s = await post('/sessions', { cwd: cwd || undefined, title: 'spike ' + new Date().toLocaleTimeString(), approvalMode: 'manual' });
+        await loadSessions(); open(s.id); } catch (e) { node('div','row err', '建会话失败：' + e.message); }
+};
+$('send').onclick = async () => {
+  const text = $('input').value.trim(); if (!text || !state.sessionId) return;
+  $('input').value = '';
+  node('div','row').appendChild(el('div','user', text));
+  try { await post(`/sessions/${state.sessionId}/prompt`, { prompt: text }); }
+  catch (e) {
+    if (e.status === 409) { await post(`/sessions/${state.sessionId}/queue`, { text }); node('div','row err','会话忙，已排队（queue）'); }
+    else node('div','row err', '发送失败：' + e.message);
+  }
+};
+$('abort').onclick = () => state.sessionId && post(`/sessions/${state.sessionId}/abort`, {}).catch(e => node('div','row err', '中止失败：' + e.message));
+$('input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('send').click(); } });
+
+// Leave cwd empty → the sidecar resolves its own default and the record's
+// workspaceSource tells us who decided (protocol.ts:307). Never guess a path here.
+loadSessions().catch(e => node('div','row err', e.message));
+setPhase('idle');
+</script>
+</body>
+</html>

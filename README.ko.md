@@ -26,13 +26,13 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/huiliyi37/Tianshu-harness?color=8B5CF6&label=Release&logo=github&style=for-the-badge" alt="GitHub release">
+  <img src="https://img.shields.io/github/v/release/Wphuaenilng/JunTian-harness?color=8B5CF6&label=Release&logo=github&style=for-the-badge" alt="GitHub release">
   <img src="https://img.shields.io/badge/License-Apache%202.0-3B5BDB?style=for-the-badge&logo=apache" alt="License">
   <img src="https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript" alt="TypeScript">
   <img src="https://img.shields.io/badge/Tests-19%2C000%2B%20Passed-green?style=for-the-badge&logo=testinglibrary" alt="Tests">
   <a href="https://discord.gg/XjWTATCHB"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://atomgit.com/huiliyi37/Tianshu-harness"><img src="https://atomgit.com/huiliyi37/Tianshu-harness/star/badge.svg" alt="AtomGit Star"></a>
-  <a href="https://github.com/huiliyi37/Tianshu-harness/releases"><img src="https://img.shields.io/github/downloads/huiliyi37/Tianshu-harness/total?logo=github&label=downloads" alt="GitHub downloads"></a>
+  <a href="https://atomgit.com/Wphuaenilng/JunTian-harness"><img src="https://atomgit.com/Wphuaenilng/JunTian-harness/star/badge.svg" alt="AtomGit Star"></a>
+  <a href="https://github.com/Wphuaenilng/JunTian-harness/releases"><img src="https://img.shields.io/github/downloads/Wphuaenilng/JunTian-harness/total?logo=github&label=downloads" alt="GitHub downloads"></a>
   <a href="https://www.npmjs.com/package/tianshu-tui"><img src="https://img.shields.io/npm/dm/tianshu-tui?label=npm%20tianshu-tui" alt="npm tianshu-tui downloads"></a>
   <a href="https://www.npmjs.com/package/tianshu-harness"><img src="https://img.shields.io/npm/dm/tianshu-harness?label=npm%20tianshu-harness" alt="npm tianshu-harness downloads"></a>
 </p>
@@ -154,22 +154,22 @@ Layer 4: RuntimeHookPipeline（75 hooks） → trap-and-emulate 拦截退化行�
 
 ### 2. 설치（택一）
 
-**방식 A: 데스크톱 앱（설치하면 바로 사용）** —— [GitHub Releases](https://github.com/huiliyi37/Tianshu-harness/releases/latest)에서 다운로드: macOS `.dmg`（Apple Silicon / Intel 이중 아키텍처）· Windows `.exe` 설치 마법사 · Linux `.AppImage`.
+**방식 A: 데스크톱 앱（설치하면 바로 사용）** —— [GitHub Releases](https://github.com/Wphuaenilng/JunTian-harness/releases/latest)에서 다운로드: macOS `.dmg`（Apple Silicon / Intel 이중 아키텍처）· Windows `.exe` 설치 마법사 · Linux `.AppImage`.
 > **Linux 지원 범위（3.11.2 최초 제공）**: x64 AppImage 무설치——`chmod +x Tianshu_*.AppImage` 후 바로 실행. glibc ≥ 2.35（Ubuntu 22.04+ / Debian 12+ 등 주요 배포판） 필요, X11 세션 권장（Wayland는 미검증）. 알려진 제한: 음성 입력은 아직 불가（whisper 커뮤니티 빌드 부재로 브라우저 음성에 자동 폴백）; 데스크톱 자동 업데이트는 Linux에서도 동작합니다.
 
-> **Windows 지원 범위**: Windows 10（1809+, 22H2 권장）/ Windows 11. 화면 렌더링은 **WebView2 Runtime（≥ 120 권장）**에 의존합니다——v3.5부터의 스크롤·렌더링 최적화는 최신 런타임이 필요하며, 구버전은 세션 영역 스크롤이 끊깁니다. 3.5.3부터 설치 프로그램에 완전한 오프라인 설치 패키지가 내장됩니다（네트워크 불필요, 시스템 레벨 등록）. 기존 사용자가 자동 업데이트 후 "너무 오래됨" 안내를 받으면: 안내 바 또는 「설정 → 런타임 및 정보」에서 「복구 도구 실행」. **창이 아예 열리지 않을 때**는 시작 메뉴의 「WebView2 복구」를 사용하거나, [Releases](https://github.com/huiliyi37/Tianshu-harness/releases/latest)에서 `windows-repair` 디렉터리의 `repair-webview2.cmd`를 더블클릭하세요. 또는 [WebView2 오프라인 설치 패키지](https://go.microsoft.com/fwlink/p/?LinkId=2124703)를 수동 설치 후 재시작하세요.
+> **Windows 지원 범위**: Windows 10（1809+, 22H2 권장）/ Windows 11. 화면 렌더링은 **WebView2 Runtime（≥ 120 권장）**에 의존합니다——v3.5부터의 스크롤·렌더링 최적화는 최신 런타임이 필요하며, 구버전은 세션 영역 스크롤이 끊깁니다. 3.5.3부터 설치 프로그램에 완전한 오프라인 설치 패키지가 내장됩니다（네트워크 불필요, 시스템 레벨 등록）. 기존 사용자가 자동 업데이트 후 "너무 오래됨" 안내를 받으면: 안내 바 또는 「설정 → 런타임 및 정보」에서 「복구 도구 실행」. **창이 아예 열리지 않을 때**는 시작 메뉴의 「WebView2 복구」를 사용하거나, [Releases](https://github.com/Wphuaenilng/JunTian-harness/releases/latest)에서 `windows-repair` 디렉터리의 `repair-webview2.cmd`를 더블클릭하세요. 또는 [WebView2 오프라인 설치 패키지](https://go.microsoft.com/fwlink/p/?LinkId=2124703)를 수동 설치 후 재시작하세요.
 > **Win10 태블릿 모드 알려진 동작**: 태블릿 모드에서 앱 전환 시 이전 앱이 화면 밖으로 밀려납니다——computer_use 스냅샷이 가림/백그라운드 자가복구를 수행하므로（PrintWindow 렌더링）태블릿 모드를 끌 필요가 없습니다.
 
 **방식 B: 원클릭 설치 스크립트（권장）** —— Node ≥ 24 확인 → `tianshu-harness` 전역 설치（기본 npmmirror 미러 가속, `NPM_CONFIG_REGISTRY`로 덮어쓰기 가능）→ `tianshu` 실행. 멱등하게 반복 실행 가능:
 
 ```bash
 # macOS / Linux（bash）
-bash <(curl -fsSL https://raw.githubusercontent.com/huiliyi37/Tianshu-harness/main/scripts/install-tui.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/Wphuaenilng/JunTian-harness/main/scripts/install-tui.sh)
 # 只安装不启动：
-bash <(curl -fsSL https://raw.githubusercontent.com/huiliyi37/Tianshu-harness/main/scripts/install-tui.sh) --no-launch
+bash <(curl -fsSL https://raw.githubusercontent.com/Wphuaenilng/JunTian-harness/main/scripts/install-tui.sh) --no-launch
 
 # Windows（PowerShell）
-powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/huiliyi37/Tianshu-harness/main/scripts/install-tui.ps1 | iex"
+powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Wphuaenilng/JunTian-harness/main/scripts/install-tui.ps1 | iex"
 # 只安装不启动（克隆仓库后本地跑）：
 powershell -ExecutionPolicy Bypass -File scripts\install-tui.ps1 -NoLaunch
 ```
@@ -186,7 +186,7 @@ tianshu
 **방식 D: 소스에서 빌드**:
 
 ```bash
-git clone https://github.com/huiliyi37/Tianshu-harness.git
+git clone https://github.com/Wphuaenilng/JunTian-harness.git
 cd Tianshu-harness
 npm install
 npm run build      # 生成 dist/cli/entry.js
@@ -1163,17 +1163,17 @@ tianshu logs open desktop            # 打开 sidecar 日志目录（GUI 起不�
 
 ## 🤝 커뮤니티와 지원
 
-- **사용 문제 / 토론** → [GitHub Discussions](https://github.com/huiliyi37/Tianshu-harness/discussions)
+- **사용 문제 / 토론** → [GitHub Discussions](https://github.com/Wphuaenilng/JunTian-harness/discussions)
 - **Discord 커뮤니티** → [Tianshu Harness Discord 참여](https://discord.gg/XjWTATCHB)
-- **버그 리포트 / 기능 요청** → [GitHub Issues](https://github.com/huiliyi37/Tianshu-harness/issues)
-- **보안 취약점** → [비공개 보고](https://github.com/huiliyi37/Tianshu-harness/security/advisories/new)（공개 issue를 열지 말 것）
+- **버그 리포트 / 기능 요청** → [GitHub Issues](https://github.com/Wphuaenilng/JunTian-harness/issues)
+- **보안 취약점** → [비공개 보고](https://github.com/Wphuaenilng/JunTian-harness/security/advisories/new)（공개 issue를 열지 말 것）
 - **코드 기여** → [CONTRIBUTING.md](CONTRIBUTING.md) 참조
 - **도움 요청 가이드** → [SUPPORT.md](SUPPORT.md) 참조
 - **위챗 교류 그룹** → 「天枢 harness 交流群5群」, QR 코드를 스캔해 입장, 일상 토론 / 피드백 / 최신 릴리스 소식을 가장 먼저 받아볼 수 있습니다:
 
 <img src="docs/brand/assets/wechat-group-qr.png" width="280" alt="天枢 harness 交流群5群微信群二维码">
 
-> 위챗 그룹 QR 코드에는 유효기간이 있습니다（7일）. 만료되면 [Discussions](https://github.com/huiliyi37/Tianshu-harness/discussions)나 Issue에 남겨 주시면 관리자가 새 코드를 올려 드립니다.
+> 위챗 그룹 QR 코드에는 유효기간이 있습니다（7일）. 만료되면 [Discussions](https://github.com/Wphuaenilng/JunTian-harness/discussions)나 Issue에 남겨 주시면 관리자가 새 코드를 올려 드립니다.
 
 > 참고: 먼저 저장소 관리자가 `Settings → General → Discussions`에서 Discussions 기능을 켜 두어야 합니다.
 
@@ -1219,11 +1219,11 @@ tianshu logs open desktop            # 打开 sidecar 日志目录（GUI 起不�
 
 ## ⭐ 스타 히스토리
 
-<a href="https://star-history.com/#huiliyi37/tianshu-harness&Date">
+<a href="https://star-history.com/#Wphuaenilng/JunTian-harness&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=huiliyi37/tianshu-harness&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=huiliyi37/tianshu-harness&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=huiliyi37/tianshu-harness&type=Date" width="700" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Wphuaenilng/JunTian-harness&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Wphuaenilng/JunTian-harness&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Wphuaenilng/JunTian-harness&type=Date" width="700" />
   </picture>
 </a>
 

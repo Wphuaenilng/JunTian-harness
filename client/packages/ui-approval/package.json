@@ -1,0 +1,17 @@
+{
+  "name": "@tianshu/ui-approval",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Three-state approval panel (once / always=remember / deny) with a visible stall reminder.",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./styles.css": "./src/styles.css"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  },
+  "dependencies": {
+    "@tianshu/locale": "workspace:*"
+  }
+}

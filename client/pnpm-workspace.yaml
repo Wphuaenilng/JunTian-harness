@@ -1,0 +1,19 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+
+# pnpm >=10 no longer reads the `pnpm` field in package.json, so the build-script
+# allowlist has to live here — the same rule the repo root's pnpm-workspace.yaml
+# documents. Without it esbuild's install script is skipped silently and vite build
+# dies on a binary/wrapper mismatch.
+# Both keys: allowBuilds is what pnpm 11/12 actually honors,
+# onlyBuiltDependencies is the pnpm 10 name (kept so pnpm 10 works out of the box).
+# electron must be listed or pnpm skips its install script silently and
+# `electron .` dies on "Electron binary not found".
+allowBuilds:
+  esbuild: true
+  electron: true
+
+onlyBuiltDependencies:
+  - esbuild
+  - electron

@@ -1,0 +1,35 @@
+{
+  "name": "@tianshu/app-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser app: assembles the ui-* packages over client-core. Same product the Electron shell will host in M3.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tianshu/client-core": "workspace:*",
+    "@tianshu/locale": "workspace:*",
+    "@tianshu/store": "workspace:*",
+    "@tianshu/ui-approval": "workspace:*",
+    "@tianshu/ui-chat": "workspace:*",
+    "@tianshu/ui-primitives": "workspace:*",
+    "@tianshu/ui-schedule": "workspace:*",
+    "@tianshu/ui-files": "workspace:*",
+    "@tianshu/ui-git": "workspace:*",
+    "@tianshu/ui-session": "workspace:*",
+    "@tianshu/ui-settings": "workspace:*",
+    "@tianshu/ui-theme": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.3"
+  }
+}

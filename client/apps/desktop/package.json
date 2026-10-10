@@ -1,0 +1,16 @@
+{
+  "name": "@tianshu/app-desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Electron shell for the same client: spawns the sidecar, serves the built app over one origin, and loads it. The kernel is never modified — this is a host, not a fork.",
+  "main": "src/main.mjs",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke 12 --tray-check",
+    "icon": "node scripts/make-icon.mjs"
+  },
+  "devDependencies": {
+    "electron": "44.7.0"
+  }
+}

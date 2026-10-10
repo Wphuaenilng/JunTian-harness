@@ -1,0 +1,9 @@
+{
+  "name": "@tianshu/locale",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Flat zh/en dictionary and the t()/useT() runtime. Infrastructure, not a business package — ui-* may depend on it.",
+  "exports": { ".": "./src/index.ts" },
+  "peerDependencies": { "react": "^18.3.1" }
+}

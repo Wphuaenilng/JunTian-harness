@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://tianshuharness.com"><b>🌐 tianshuharness.com</b></a> · 
-  <a href="https://atomgit.com/huiliyi37/Tianshu-harness"><b>AtomGit mirror</b></a> · 
+  <a href="https://atomgit.com/Wphuaenilng/JunTian-harness"><b>AtomGit mirror</b></a> · 
   📖 <b>English</b> · 
   <a href="README.md">🇨🇳 中文</a> · 
   <a href="README.ja.md">🇯🇵 日本語</a> · 
@@ -22,13 +22,13 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/huiliyi37/Tianshu-harness?color=8B5CF6&label=Release&logo=github&style=for-the-badge" alt="GitHub release">
+  <img src="https://img.shields.io/github/v/release/Wphuaenilng/JunTian-harness?color=8B5CF6&label=Release&logo=github&style=for-the-badge" alt="GitHub release">
   <img src="https://img.shields.io/badge/License-Apache%202.0-3B5BDB?style=for-the-badge&logo=apache" alt="License">
   <img src="https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge&logo=typescript" alt="TypeScript">
   <img src="https://img.shields.io/badge/Tests-19%2C000%2B%20Passed-green?style=for-the-badge&logo=testinglibrary" alt="Tests">
   <a href="https://discord.gg/XjWTATCHB"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://atomgit.com/huiliyi37/Tianshu-harness"><img src="https://atomgit.com/huiliyi37/Tianshu-harness/star/badge.svg" alt="AtomGit Star"></a>
-  <a href="https://github.com/huiliyi37/Tianshu-harness/releases"><img src="https://img.shields.io/github/downloads/huiliyi37/Tianshu-harness/total?logo=github&label=downloads" alt="GitHub downloads"></a>
+  <a href="https://atomgit.com/Wphuaenilng/JunTian-harness"><img src="https://atomgit.com/Wphuaenilng/JunTian-harness/star/badge.svg" alt="AtomGit Star"></a>
+  <a href="https://github.com/Wphuaenilng/JunTian-harness/releases"><img src="https://img.shields.io/github/downloads/Wphuaenilng/JunTian-harness/total?logo=github&label=downloads" alt="GitHub downloads"></a>
   <a href="https://www.npmjs.com/package/tianshu-tui"><img src="https://img.shields.io/npm/dm/tianshu-tui?label=npm%20tianshu-tui" alt="npm tianshu-tui downloads"></a>
   <a href="https://www.npmjs.com/package/tianshu-harness"><img src="https://img.shields.io/npm/dm/tianshu-harness?label=npm%20tianshu-harness" alt="npm tianshu-harness downloads"></a>
 </p>
@@ -168,19 +168,19 @@ Agent core logic (multi-turn loops, tool pipelines, context compaction) is notor
 
 ### 2. Install (pick one)
 
-**A. Desktop app (ready to use)** — download from [GitHub Releases](https://github.com/huiliyi37/Tianshu-harness/releases/latest): macOS `.dmg` (Apple Silicon / Intel) · Windows `.exe` setup wizard · Linux `.AppImage`.
+**A. Desktop app (ready to use)** — download from [GitHub Releases](https://github.com/Wphuaenilng/JunTian-harness/releases/latest): macOS `.dmg` (Apple Silicon / Intel) · Windows `.exe` setup wizard · Linux `.AppImage`.
 > **Linux support scope (new in 3.11.2)**: x64 AppImage, no install needed — `chmod +x Tianshu_*.AppImage` and run; requires glibc ≥ 2.35 (Ubuntu 22.04+ / Debian 12+ and other mainstream distros); X11 recommended (Wayland untested). Known limitation: voice input is unavailable on Linux for now (no community whisper build — falls back to browser speech); desktop auto-update works on Linux too.
 
 **B. One-line installer (recommended)** — checks Node ≥ 24 → installs `tianshu-harness` globally (npmmirror registry by default; override via `NPM_CONFIG_REGISTRY`) → launches `tianshu`; idempotent, safe to re-run:
 
 ```bash
 # macOS / Linux (bash)
-bash <(curl -fsSL https://raw.githubusercontent.com/huiliyi37/Tianshu-harness/main/scripts/install-tui.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/Wphuaenilng/JunTian-harness/main/scripts/install-tui.sh)
 # install without launching:
-bash <(curl -fsSL https://raw.githubusercontent.com/huiliyi37/Tianshu-harness/main/scripts/install-tui.sh) --no-launch
+bash <(curl -fsSL https://raw.githubusercontent.com/Wphuaenilng/JunTian-harness/main/scripts/install-tui.sh) --no-launch
 
 # Windows (PowerShell)
-powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/huiliyi37/Tianshu-harness/main/scripts/install-tui.ps1 | iex"
+powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Wphuaenilng/JunTian-harness/main/scripts/install-tui.ps1 | iex"
 # install without launching (after cloning the repo):
 powershell -ExecutionPolicy Bypass -File scripts\install-tui.ps1 -NoLaunch
 ```
@@ -197,7 +197,7 @@ tianshu
 **D. Build from source**:
 
 ```bash
-git clone https://github.com/huiliyi37/Tianshu-harness.git
+git clone https://github.com/Wphuaenilng/JunTian-harness.git
 cd Tianshu-harness
 npm install
 npm run build      # produces dist/cli/entry.js
@@ -1050,10 +1050,10 @@ Write only the fields you want to override; defaults are deep-merged. Full schem
 
 ## 🤝 Community & Support
 
-- **Usage questions / discussions** → [GitHub Discussions](https://github.com/huiliyi37/Tianshu-harness/discussions)
+- **Usage questions / discussions** → [GitHub Discussions](https://github.com/Wphuaenilng/JunTian-harness/discussions)
 - **Discord community** → [Join the Tianshu Harness Discord](https://discord.gg/XjWTATCHB)
-- **Bug reports / feature requests** → [GitHub Issues](https://github.com/huiliyi37/Tianshu-harness/issues)
-- **Security vulnerabilities** → [Report privately](https://github.com/huiliyi37/Tianshu-harness/security/advisories/new) (do not open a public issue)
+- **Bug reports / feature requests** → [GitHub Issues](https://github.com/Wphuaenilng/JunTian-harness/issues)
+- **Security vulnerabilities** → [Report privately](https://github.com/Wphuaenilng/JunTian-harness/security/advisories/new) (do not open a public issue)
 - **Contributing** → See [CONTRIBUTING.md](CONTRIBUTING.md)
 - **Support guide** → See SUPPORT.md
 - **WeChat group** → 「天枢 harness 交流群5群」 — scan the QR code below to join (QR codes expire every 7 days; leave a note in Discussions once expired):
@@ -1064,11 +1064,11 @@ Write only the fields you want to override; defaults are deep-merged. Full schem
 
 ## ⭐ Star History
 
-<a href="https://star-history.com/#huiliyi37/tianshu-harness&Date">
+<a href="https://star-history.com/#Wphuaenilng/JunTian-harness&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=huiliyi37/tianshu-harness&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=huiliyi37/tianshu-harness&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=huiliyi37/tianshu-harness&type=Date" width="700" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Wphuaenilng/JunTian-harness&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Wphuaenilng/JunTian-harness&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Wphuaenilng/JunTian-harness&type=Date" width="700" />
   </picture>
 </a>
 

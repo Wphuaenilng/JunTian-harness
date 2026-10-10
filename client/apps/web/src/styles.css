@@ -1,0 +1,105 @@
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: var(--font); color: var(--label-primary); background: var(--bg-base);
+  font-size: 14px; -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr auto;
+  grid-template-rows: 1fr var(--statusbar-height);
+}
+.app > aside:not(.app__rail) { grid-row: 1 / 3; min-height: 0; }
+.app > main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+/* Collapsed right rail is 44px, per design/tianshu-desktop-mockup-dsh-collapsed.png. */
+.app__rail {
+  grid-row: 1 / 3;
+  width: 44px;
+  min-height: 0;
+  border-left: 1px solid var(--border-l1);
+  background: var(--bg-sidebar);
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.app__rail--open { width: 320px; justify-content: stretch; align-items: stretch; }
+.app__railbtn {
+  margin-top: 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--label-tertiary);
+  letter-spacing: 1px;
+  /* Vertical instead of a hardcoded `面<br>板`: CJK stacks character-by-character and
+     Latin rotates sideways, so the same label reads correctly in both languages. */
+  writing-mode: vertical-rl;
+}
+.app__rail--open > * { flex: 1; min-width: 0; }
+.app__panel { display: flex; flex-direction: column; min-height: 0; width: 100%; }
+.app__panel-head {
+  display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px 0;
+  border-bottom: 1px solid var(--border-l1); background: var(--bg-sidebar);
+}
+/* wrap, not scroll: "Automations" is wider than the 320px rail's share, and a tab the
+   reader cannot see is worse than a second row. Chinese stays on one row. */
+.app__tabs { display: flex; flex-wrap: wrap; gap: 2px; flex: 1; min-width: 0; }
+.app__tab {
+  font: inherit; font-size: 12px; padding: 5px 10px; border: none; cursor: pointer;
+  background: none; color: var(--label-tertiary); border-radius: 7px 7px 0 0;
+}
+.app__tab:hover { background: var(--bg-hover); }
+.app__tab--on { color: var(--label-primary); background: var(--bg-base); box-shadow: inset 0 -2px 0 var(--accent); }
+.app__panel-body { flex: 1; min-height: 0; overflow: auto; }
+
+.app__banner {
+  display: flex; gap: 10px; align-items: center; justify-content: space-between;
+  margin: 10px 16px 0; padding: 8px 11px; border-radius: 8px; font-size: 12.5px;
+  background: var(--bg-selector); border: 1px solid var(--border-l2); color: var(--label-secondary);
+}
+.app__banner--danger { background: #FDECEC; border-color: var(--danger); color: var(--danger); }
+.app__banner button { border: none; background: none; cursor: pointer; color: inherit; }
+
+.app__composer { border-top: 1px solid var(--border-l1); padding: 10px 0 12px; background: var(--bg-base); }
+.app__composer-col { max-width: var(--measure); margin: 0 auto; }
+.app__input-row { display: flex; gap: 8px; align-items: flex-end; }
+.app__input-row textarea {
+  flex: 1; font: inherit; resize: none; border: 1px solid var(--border-l2); border-radius: 10px;
+  padding: 9px 11px; max-height: 140px; background: var(--bg-base); color: var(--label-primary);
+}
+.app__input-row textarea:focus { outline: none; border-color: var(--ds-400); }
+.app__send {
+  font: inherit; font-size: 13px; padding: 8px 14px; border: none; border-radius: 9px;
+  background: var(--nb-1000); color: #fff; cursor: pointer;
+}
+.app__ghost {
+  font: inherit; font-size: 13px; padding: 8px 12px; border: 1px solid transparent;
+  border-radius: 9px; background: none; color: var(--label-secondary); cursor: pointer;
+}
+.app__ghost:disabled { color: var(--label-caption); cursor: default; }
+.app__empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--label-caption); font-size: 13px; }
+
+.app__status {
+  grid-column: 1 / 4; border-top: 1px solid var(--border-l1); background: var(--bg-sidebar);
+  display: flex; align-items: center; gap: 14px; padding: 0 14px;
+  font-size: 11.5px; color: var(--label-tertiary);
+}
+.app__status span { white-space: nowrap; }
+.app__grow { flex: 1; }
+.app__cockpit { display: flex; gap: 10px; align-items: baseline; font-family: var(--font-code); font-size: 11px; color: var(--label-secondary); }
+.app__cockpit b { color: var(--label-primary); font-weight: 600; }
+.app__cache--good { color: var(--ok); }
+.app__compact { color: var(--warn); }
+.app__theme {
+  font: inherit; font-size: 11px; padding: 1px 8px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border-l2); background: var(--bg-base); color: var(--label-tertiary);
+}
+.app__dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--nb-400); margin-right: 5px; }
+.app__dot--live { background: var(--ok); }
+.app__dot--replay, .app__dot--connecting { background: var(--ds-400); }
+.app__dot--down { background: var(--danger); }
