@@ -19,12 +19,20 @@
     "check:docs": "node scripts/check-docs.mjs",
     "check:theme": "node scripts/check-theme.mjs",
     "check:layers": "node scripts/check-layers.mjs",
+    "check:mockup": "node scripts/check-mockup-tokens.mjs",
+    "check:mockup-render": "node scripts/check-mockup-render.mjs",
+    "check:layout": "node scripts/check-layout.mjs",
+    "check:geometry": "node scripts/check-mockup-geometry.mjs",
+    "check:scale": "node scripts/check-scale.mjs",
+    "check:liverender": "node scripts/check-live-geometry.mjs",
     "check:contrast": "node scripts/check-contrast.mjs",
+    "check:wire": "node scripts/check-wire-mirror.mjs",
     "dev": "node scripts/serve-client.mjs --dev",
     "start": "node scripts/serve-client.mjs",
     "build": "corepack pnpm -r build",
-    "typecheck": "tsc -b packages/client-core",
-    "test": "node --test packages/*/test/*.test.ts"
+    "typecheck": "tsc -b packages/client-core && tsc --noEmit -p apps/web && tsc --noEmit -p apps/web/tsconfig.check.json",
+    "test": "node --test packages/*/test/*.test.ts",
+    "verify:all": "node scripts/verify-all.mjs"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

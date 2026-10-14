@@ -1,10 +1,10 @@
 /**
  * Incremental markdown (plan §8: the only fix for the streaming O(n²) trap).
  *
- * A run appends deltas into ONE block. Re-parsing the whole block per delta costs
- * O(n) per token, so a long answer costs O(n²) and the UI stutters near the end.
- * Blocks are immutable once sealed, so parse each block once and only re-parse the
- * open tail — the tail is short-lived and bounded, so total cost is O(n).
+ * A run appends deltas into ONE block, and re-parsing that block per delta costs O(n) per token, so
+ * a long answer costs O(n²) and the UI stutters near the end. Two levels keep it O(n): a sealed block
+ * is parsed once, and inside the still-open block every finished top-level segment seals as soon as
+ * its blank line arrives (see cutPoint), so only the current paragraph ever re-parses.
  */
 import { micromark } from 'micromark'
 
@@ -20,12 +20,107 @@ function stabilizeUntrustedTail(md: string): string {
 
 const cache = new Map<number, string>()
 
+/**
+ * Counting seam for the §8 claim「增量 markdown 是 O(n²) 陷阱的唯一解法」. Before this existed the
+ * claim was only true of a one-off measurement script that nobody re-ran, so deleting the cache
+ * below would have passed every check in the tree. Two integer increments on a cold path — no
+ * subscription, no allocation, nothing reads it in product code.
+ */
+export const markdownParseCount = { calls: 0, chars: 0 }
+
+function parse(source: string, stabilize: boolean): string {
+  markdownParseCount.calls += 1
+  // The raw length is what the O(n) claim is about; the fence stabiliser adds a couple of chars.
+  markdownParseCount.chars += source.length
+  return micromark(stabilize ? stabilizeUntrustedTail(source) : source, { allowDangerousHtml: false })
+}
+
+/** Per-open-block streaming state: HTML of the blocks already sealed inside it, and where they end. */
+const streaming = new Map<number, { sealedLen: number; html: string }>()
+
+interface Segment { start: number; end: number; first: string }
+
+/** Top-level block segments from `on`: a blank line outside a fence ends a block; a fence stays one
+ *  segment even when it contains blank lines, and so do the raw HTML blocks (comment, `pre`,
+ *  `script`, `style`, `textarea`) that CommonMark runs past blank lines. */
+function segments(src: string, on: number): Segment[] {
+  const out: Segment[] = []
+  let start = -1
+  let end = 0
+  let first = ''
+  let fence: string | null = null
+  let rawEnd: RegExp | null = null
+  let i = on
+  while (i < src.length) {
+    const nl = src.indexOf('\n', i)
+    const lineEnd = nl === -1 ? src.length : nl
+    const after = nl === -1 ? src.length : nl + 1
+    const line = src.slice(i, lineEnd)
+    const marker = /^ {0,3}(`{3,}|~{3,})/.exec(line)?.[1]?.slice(0, 3)
+    if (start === -1 && line.trim() !== '') {
+      start = i
+      end = after
+      first = line
+      if (marker !== undefined) fence = marker
+      else if (/^ {0,3}<!--/.test(line)) rawEnd = /-->/
+      else {
+        const tag = /^ {0,3}<(pre|script|style|textarea)[\s>]/i.exec(line)?.[1]
+        if (tag !== undefined) rawEnd = new RegExp(`</${tag}>`, 'i')
+      }
+    } else if (fence === null && rawEnd === null && line.trim() === '') {
+      if (start !== -1) {
+        out.push({ start, end, first })
+        start = -1
+      }
+    } else if (start !== -1) {
+      end = after
+      if (fence !== null) {
+        if (marker !== undefined && marker === fence) fence = null
+      } else if (rawEnd !== null && rawEnd.test(line)) rawEnd = null
+    }
+    i = after
+  }
+  if (start !== -1) out.push({ start, end, first })
+  return out
+}
+
+const LIST_FIRST = /^ {0,3}(?:[-*+]|\d{1,3}[.)])(?:\s|$)/
+const QUOTE_FIRST = /^ {0,3}>/
+const FENCE_FIRST = /^ {0,3}(`{3,}|~{3,})/
+/** Raw HTML blocks that a blank line does NOT end (CommonMark types 1-5); never cut around them. */
+const RAW_BLOCK = /^ {0,3}(?:<!--|<!\[|<(?:pre|script|style|textarea)[\s>])/i
+
+/**
+ * End offset of the last boundary this still-open source may be cut at, or `on` when there is none.
+ *
+ * A cut must not change a byte of the HTML, so only boundaries whose two neighbouring blocks cannot
+ * merge in a whole-document parse are usable: a blank line ends paragraphs, headings, tables and
+ * finished fences for good, but two lists merge into one loose `<ul>`, two blockquotes merge into one
+ * `<blockquote>`, an indented follow-on line is a continuation, and types 1-5 HTML blocks run past
+ * blank lines. The last segment is never cut — it is still arriving.
+ */
+function cutPoint(src: string, on: number): number {
+  const segs = segments(src, on)
+  let cut = on
+  for (let k = 0; k < segs.length - 1; k++) {
+    const s = segs[k]!
+    const next = segs[k + 1]!
+    if (LIST_FIRST.test(s.first) && LIST_FIRST.test(next.first)) continue
+    if (QUOTE_FIRST.test(s.first) && QUOTE_FIRST.test(next.first)) continue
+    if (RAW_BLOCK.test(s.first) || RAW_BLOCK.test(next.first)) continue
+    if (/^\s/.test(next.first) && !FENCE_FIRST.test(next.first)) continue
+    cut = s.end
+  }
+  return cut
+}
+
 export function renderMarkdown(id: number, source: string, open: boolean): string {
   if (!open) {
     const hit = cache.get(id)
     if (hit !== undefined) return hit
-    const html = micromark(source, { allowDangerousHtml: false })
+    const html = parse(source, false)
     cache.set(id, html)
+    streaming.delete(id)
     // Bounded: closed blocks only grow while a session is open, and this is a view
     // cache, not data — dropping the oldest on overflow keeps long runs cheap.
     if (cache.size > 3000) {
@@ -34,7 +129,34 @@ export function renderMarkdown(id: number, source: string, open: boolean): strin
     }
     return html
   }
-  return micromark(stabilizeUntrustedTail(source), { allowDangerousHtml: false })
+  let st = streaming.get(id)
+  if (st === undefined) {
+    st = { sealedLen: 0, html: '' }
+    streaming.set(id, st)
+    if (streaming.size > 3000) {
+      const oldest = streaming.keys().next().value
+      if (oldest !== undefined) streaming.delete(oldest)
+    }
+  }
+  const cut = cutPoint(source, st.sealedLen)
+  if (cut > st.sealedLen) {
+    // Each slice carries its own trailing blank line, which micromark turns into a trailing "\n";
+    // dropping it here keeps the concatenation byte-identical to parsing the whole source.
+    const sealed = parse(source.slice(st.sealedLen, cut), false).replace(/\n+$/, '')
+    st.html = st.html === '' ? sealed : `${st.html}\n${sealed}`
+    st.sealedLen = cut
+  }
+  const tail = parse(source.slice(st.sealedLen), true)
+  return st.html === '' ? tail : `${st.html}\n${tail}`
+}
+
+/**
+ * Read-only test seam: how large the two view caches currently are. Same standing as
+ * `markdownParseCount` — product code never reads it, and it exists because "dropping the oldest on
+ * overflow keeps long runs cheap" was a comment about a number nobody was checking.
+ */
+export function markdownCacheStats(): { blocks: number; streams: number } {
+  return { blocks: cache.size, streams: streaming.size }
 }
 
 export interface DiffHunk {

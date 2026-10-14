@@ -57,7 +57,12 @@ async function teardown() {
   if (serve !== undefined && serve !== null && !serve.killed) serve.kill('SIGTERM')
   if (!keep) {
     await stopSidecar()
-    rmSync(tmp, { recursive: true, force: true })
+    // 同 verify-dev-proxy：`force:true` 压不住 Windows 上子进程还攥着句柄时的 EBUSY/EPERM，而
+    // teardown 是在 finally 里跑的——从那里抛出会绕过本脚本的 catch，报成"没有 ✗ 只有崩溃横幅"。
+    // 这条由 `check:layers` 的「验法收尾」判定常驻盯着（面从 scripts/*.mjs 派生，新脚本自动在内）。
+    try { rmSync(tmp, { recursive: true, force: true }) } catch (e) {
+      console.log(`  i 临时目录没删净（${tmp}）：${e && e.code ? e.code : e}——不影响演示，不记成失败`)
+    }
   }
 }
 
@@ -77,12 +82,15 @@ if (existsSync(infoPath)) await stopSidecar()
 
 const launcher = run([
   join(clientRoot, 'scripts/launch-sidecar.mjs'),
-  '--state-dir', stateDir, '--desktop-dir', dataDir, '--config', configPath,
+  '--state-dir', stateDir, '--desktop-dir', dataDir, '--config', configPath, '--isolate-home',
 ])
 const launchOut = []
 launcher.stdout.on('data', (b) => launchOut.push(b.toString()))
 launcher.stderr.on('data', (b) => launchOut.push(b.toString()))
-const launchExit = await new Promise((res) => launcher.once('exit', res))
+const launchExit = await Promise.race([
+  new Promise((res) => launcher.once('exit', res)),
+  sleep(180_000).then(() => { launcher.kill('SIGKILL'); return 'TIMEOUT-180s' }),
+])
 if (launchExit !== 0) {
   console.error(launchOut.join('').split('\n').slice(-10).join('\n'))
   await bail(`keyless sidecar did not boot (exit ${launchExit})`)

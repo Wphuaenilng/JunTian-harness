@@ -9,6 +9,13 @@
 /** Quiet for the first stretch, then a hint, then the alarm. Both tick in whole seconds. */
 export const APPROVAL_HINT_AFTER_MS = 8_000
 
+/**
+ * 计划 M1 那个「30 秒」的**唯一一个家**：面板的默认阈值和测试都读它。
+ * 之前测试是 `describeWait(ms, 30_000)` 把数传进去的，于是有人把面板默认改成 60_000，
+ * 测试照绿——数字有两个家的时候，计划核的是哪一个就不清楚了。
+ */
+export const APPROVAL_STALL_AFTER_MS = 30_000
+
 export interface ApprovalWait {
   /** Elapsed whole seconds shown as a quiet hint, or null. */
   hintSeconds: number | null

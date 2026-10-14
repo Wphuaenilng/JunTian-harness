@@ -6,6 +6,9 @@ handed down from `ui-chat`, so it stays testable without a sidecar.
 - `MarkdownBlock` — per-block incremental parse (only the open tail re-parses).
 - `DiffBlock` / `ToolOutputBlock` — unified-diff view with +/− stats.
 - `AppFrame` — sandboxed embedded view + postMessage bridge (MCP Apps 预留).
+- `submitsOnEnter` — the composer's Enter rule as one function, so the IME guard has a single home:
+  Enter sends, Shift+Enter is a newline, and the Enter that commits an input-method candidate sends
+  nothing (`submit-key.ts`). `check:layers` pins every Enter-submitting site in the host to it.
 - Consumers import `@tianshu/ui-primitives/styles.css` once.
 
 ## The MCP Apps container (`app-frame.ts` + `app-frame-view.tsx`)
@@ -71,6 +74,11 @@ labelled fence — replaces each `<pre><code class="language-x">` with shiki's o
   tool results all land here; raw HTML must be escaped, not executed. The one place HTML
   **does** run is `AppFrame`, and it runs over there — in an opaque-origin sandbox with no
   host surface. Never move an authored document into the host DOM.
+- **A sealed block is parsed exactly once.** `renderMarkdown(id, source, open)` re-parses only the
+  `open` tail; everything else comes from the cache keyed by block id (ids are monotonic in
+  `SessionModel` and never reused, even when history paging re-derives the timeline). The cache
+  *is* plan §8's fix for the streaming O(n²) trap, so it is guarded by `markdownParseCount` plus
+  two tests in `test/markdown.test.ts` — deleting the cache lookup fails those and nothing else.
 - No component-library dependency (plan §8: 自研原语 + CSS token).
 - Style only through `--*` semantic aliases from `@tianshu/ui-theme`.
 
@@ -92,5 +100,5 @@ labelled fence — replaces each `<pre><code class="language-x">` with shiki's o
 | 端点 | — |
 | 事件类（wire 名） | — |
 | 折叠块类型 | — |
-| 宿主回调 props | `onLink` |
+| 宿主回调 props | `onLink`、`onOpenChange` |
 <!-- protocol-ledger:end -->

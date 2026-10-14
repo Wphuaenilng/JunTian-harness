@@ -2,7 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { SessionModel } from '../src/session-model.ts'
 import { classifyStreamEvent } from '../src/stream-accept.ts'
-import type { SessionEvent, StreamedEvent } from '../src/protocol-types.ts'
+import type { SessionEvent } from '../src/protocol-types.ts'
+import type { StreamedEvent } from '../src/session-stream.ts'
+import { categorize } from '../src/event-category.ts'
 
 /**
  * Plan §4.3 #3 promises three notification cadences (immediate / microtask / rAF).
@@ -22,7 +24,8 @@ import type { SessionEvent, StreamedEvent } from '../src/protocol-types.ts'
  */
 const ev = (seq: number, type: string, data: Record<string, unknown>): SessionEvent =>
   ({ seq, ts: 0, type: type as SessionEvent['type'], data })
-const streamed = (event: SessionEvent): StreamedEvent => ({ event } as unknown as StreamedEvent)
+const streamed = (event: SessionEvent): StreamedEvent =>
+  ({ event, category: categorize(event.type), generation: 1, phase: 'live' })
 
 function feedDeltas(count: number): { notifies: number; blocks: number; text: string; lastSeq: number } {
   const s = new SessionModel()

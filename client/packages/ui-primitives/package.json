@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Incremental markdown, unified-diff block, terminal output block. No dependency on other ui-* packages.",
+  "description": "Incremental markdown, unified-diff block, terminal output block, shiki fence highlighting, the sandboxed AppFrame container (MCP Apps 预留), and the composer's Enter rule (IME-safe submit). No dependency on other ui-* packages.",
   "exports": {
     ".": "./src/index.ts",
     "./styles.css": "./src/styles.css"

@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useT } from '@tianshu/locale'
 import type { ApprovalRequest, ApprovalAnswerBody } from '@tianshu/client-core'
 import { APPROVAL_CHOICES, answerFor } from './answer.ts'
-import { describeWait, syncArrivals } from './wait.ts'
+import { describeWait, syncArrivals, APPROVAL_STALL_AFTER_MS } from './wait.ts'
 
 // Wait/threshold arithmetic lives in wait.ts so the 30-second reminder can be tested without
 // paying for a run and leaving its gate unanswered.
-export { describeWait, syncArrivals, APPROVAL_HINT_AFTER_MS } from './wait.ts'
+export { describeWait, syncArrivals, APPROVAL_HINT_AFTER_MS, APPROVAL_STALL_AFTER_MS } from './wait.ts'
 
 // The decision map lives in a JSX-free module so node:test can pin what leaves the panel.
 export { APPROVAL_CHOICES, answerFor, type ApprovalChoice } from './answer.ts'
@@ -23,7 +23,7 @@ export interface ApprovalPanelProps {
  * `remember` flag — approval-routes.ts:20 passes it straight to the runtime), deny.
  * A pending approval turns loud after `stallAfterMs` instead of waiting quietly.
  */
-export function ApprovalPanel({ approvals, onAnswer, stallAfterMs = 30_000 }: ApprovalPanelProps) {
+export function ApprovalPanel({ approvals, onAnswer, stallAfterMs = APPROVAL_STALL_AFTER_MS }: ApprovalPanelProps) {
   const t = useT()
   const arrivedAt = useRef(new Map<string, number>())
   const [now, setNow] = useState(() => Date.now())

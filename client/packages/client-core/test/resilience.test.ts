@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { openSessionStream, type StreamedEvent } from '../src/session-stream.ts'
+import { openSessionStream, reconnectCeiling, type StreamedEvent } from '../src/session-stream.ts'
 import { SessionModel } from '../src/session-model.ts'
 import type { SessionEvent } from '../src/protocol-types.ts'
 
@@ -165,3 +165,93 @@ test('a socket that dies before delivering anything keeps the cursor at zero', a
   assert.deepEqual(since, [0, 0, 0])
   assert.equal(model.current.lastSeq, 1)
 })
+
+/**
+ * §4.3 #2 names the numbers — 「指数退避 500ms→10s 加抖动」 — and until now nothing in the tree
+ * pinned them. The pacing is now a pure ceiling plus two injectable seams (`rand`, `sleepMs`), so
+ * the ladder and its reset are assertable without waiting on wall clocks.
+ */
+test('the reconnect ladder is 500ms doubling into a 10s cap', () => {
+  assert.equal(reconnectCeiling(0, 500, 10_000), 500)
+  assert.equal(reconnectCeiling(1, 500, 10_000), 1_000)
+  assert.equal(reconnectCeiling(4, 500, 10_000), 8_000)
+  assert.equal(reconnectCeiling(5, 500, 10_000), 10_000, 'the ramp saturates instead of running away')
+  assert.equal(reconnectCeiling(60, 500, 10_000), 10_000, '2**60 must not overflow past the cap')
+  assert.equal(reconnectCeiling(-3, 500, 10_000), 500, 'a negative attempt reads as the floor')
+})
+
+test('a connection that delivers resets the ladder, so a healthy period is not punished on its first drop', async () => {
+  const waits: number[] = []
+  const since: number[] = []
+  const realFetch = globalThis.fetch
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = new URL(String(input))
+    since.push(Number(url.searchParams.get('since')))
+    if (since.length <= 2) return { ok: false, status: 503 } as unknown as Response
+    if (since.length === 3) {
+      // This one works: it delivers seq 1, then the socket breaks. The delivery is the whole
+      // point — it is what must zero the run of failures.
+      return { ok: true, body: dyingBody([frame(ev(1, 'user', { text: 'hi' }))]) } as unknown as Response
+    }
+    return { ok: true, body: hangingBody([frame(ev(2, 'text_delta', { text: 'ok' }))]) } as unknown as Response
+  }) as typeof fetch
+
+  const close = openSessionStream({
+    baseUrl: 'http://127.0.0.1:0', token: 't', sessionId: 's',
+    minBackoffMs: 40, maxBackoffMs: 10_000,
+    rand: () => 1,                       // full jitter draw at its maximum ⇒ delay == ceiling
+    sleepMs: async (ms) => { waits.push(ms) },  // the wait itself is observed, not slept through
+  })
+  try {
+    const deadline = Date.now() + 2_000
+    while (Date.now() < deadline && waits.length < 3) await new Promise((r) => setTimeout(r, 2))
+  } finally {
+    close()
+    globalThis.fetch = realFetch
+  }
+
+  // Two refusals ramp (40 → 80); the third connection delivers, so the drop after it starts the
+  // ladder over again rather than waiting 160ms.
+  assert.deepEqual(waits, [40, 80, 40], `observed waits ${JSON.stringify(waits)}`)
+  assert.deepEqual(since.slice(0, 4), [0, 0, 0, 1], 'the cursor only moves once a frame actually arrived')
+})
+
+/**
+ * Both ladder tests above inject `rand: () => 1`, and at that draw "full jitter" and "no jitter at
+ * all" give the identical number — so nothing in the tree could tell the two apart, and dropping
+ * `* rand()` from the delay would have left every check green. This test puts the draw in the
+ * middle, where the three writings disagree: full jitter ⇒ draw × ceiling (10/20/40), equal jitter
+ * ⇒ half the ceiling plus draw × half (25/50/100), no jitter ⇒ the ceiling (40/80/160).
+ */
+test('the jitter draw is really multiplied in — full jitter, not equal jitter, not none', async () => {
+  const run = async (draw: () => number): Promise<number[]> => {
+    const waits: number[] = []
+    const realFetch = globalThis.fetch
+    let requests = 0
+    globalThis.fetch = (async () => {
+      requests += 1
+      // Three refusals so the ladder ramps; the fourth parks on a body that never emits. Without
+      // that park the loop spins in microtasks forever — `sleepMs` is observed here, not slept
+      // through, so nothing throttles it.
+      if (requests <= 3) return { ok: false, status: 503 } as unknown as Response
+      return { ok: true, body: hangingBody([]) } as unknown as Response
+    }) as typeof fetch
+    const close = openSessionStream({
+      baseUrl: 'http://127.0.0.1:0', token: 't', sessionId: 's',
+      minBackoffMs: 40, maxBackoffMs: 10_000,
+      rand: draw,
+      sleepMs: async (ms) => { waits.push(ms) },
+    })
+    try {
+      const deadline = Date.now() + 2_000
+      while (Date.now() < deadline && waits.length < 3) await new Promise((r) => setTimeout(r, 2))
+    } finally {
+      close()
+      globalThis.fetch = realFetch
+    }
+    return waits.slice(0, 3)
+  }
+  assert.deepEqual(await run(() => 0.25), [10, 20, 40], 'draw 0.25 must scale the whole ceiling — equal jitter would be [25, 50, 100], none would be [40, 80, 160]')
+  assert.deepEqual(await run(() => 0), [0, 0, 0], 'a zero draw must be allowed to wait nothing; a floor here would mean the draw is being ignored or clamped')
+})
+

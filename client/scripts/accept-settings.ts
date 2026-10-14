@@ -14,8 +14,8 @@ import { fileURLToPath } from 'node:url'
 import { SidecarClient } from '../packages/client-core/src/index.ts'
 
 const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const info = JSON.parse(readFileSync(join(clientRoot, '.sidecar-info.json'), 'utf8')) as { baseUrl: string; token: string }
-const api = new SidecarClient({ baseUrl: info.baseUrl, token: info.token })
+import { openInstance } from './lib-instance.ts'
+const { api, info } = openInstance('设置中心读写（PATCH /config/*，跑完还原原值）')
 
 const failures: string[] = []
 const check = (label: string, ok: boolean, detail = ''): void => {
@@ -67,7 +67,9 @@ try {
   await api.createCustomProvider({
     providerName: THROWN,
     baseUrl: 'http://127.0.0.1:9/v1',
-    apiKey: 'sk-throwaway-not-a-real-key-000000',
+    // 故意的短假值：`check:nongoals` 扫的是整片工作树的"密钥形状"（键名 + 24 字符以上值），
+    // 这条假值不能长得像真 key，否则它和一次真凭据泄漏在门里无法区分（它此前正是被门点名的）。
+    apiKey: 'not-a-real-key',
     model: { id: 'throwaway-model', contextWindow: 4096, maxTokens: 512 },
   })
   throwawayCreated = true
@@ -88,7 +90,7 @@ if (throwawayCreated) {
   let refused = false
   let refusal = ''
   try {
-    await api.setProviderKey(THROWN, keyId, { apiKey: 'sk-rotated-throwaway-key-111111' })
+    await api.setProviderKey(THROWN, keyId, { apiKey: 'rotated-fake-short' })
   } catch (e) {
     refused = true
     refusal = (e as Error).message

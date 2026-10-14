@@ -95,7 +95,7 @@ test('state-category events ride STATE_DELTA with a JSON-patch shaped body', () 
 test('the validator actually catches a broken stream (it is not vacuously green)', () => {
   const broken: AguiEvent[] = [
     { type: 'TEXT_MESSAGE_CONTENT', messageId: 'ghost', delta: 'x', timestamp: 1 },
-    { type: 'NOT_A_REAL_TYPE', timestamp: 2 },
+    { type: 'NOT_A_REAL_TYPE' as unknown as AguiEvent['type'], timestamp: 2 },
   ]
   const problems = validateAguiStream(broken)
   assert.ok(problems.some((p) => p.includes('unopened messageId')))

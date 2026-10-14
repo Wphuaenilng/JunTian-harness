@@ -15,8 +15,8 @@ import { fileURLToPath } from 'node:url'
 import { SidecarClient, effectiveStatus, RUNTIME_CAPABILITIES } from '../packages/client-core/src/index.ts'
 
 const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const info = JSON.parse(readFileSync(join(clientRoot, '.sidecar-info.json'), 'utf8')) as { baseUrl: string; token: string }
-const api = new SidecarClient({ baseUrl: info.baseUrl, token: info.token })
+import { openInstance } from './lib-instance.ts'
+const { api, info, infoPath } = openInstance('自动化看板：建→列→改→停→删')
 
 const failures: string[] = []
 const check = (label: string, ok: boolean, detail = ''): void => {
@@ -33,8 +33,14 @@ console.log(`\nGET /schedule/status → running=${status0.status.schedulerRunnin
 console.log(`  persistence: ok=${status0.persistence?.ok} path=${status0.persistence?.path}`)
 check('schedule status reports scheduler + write health',
   typeof status0.status.schedulerRunning === 'boolean' && typeof status0.persistence?.ok === 'boolean')
+// 判"落点是否在本次隔离目录内"，要比的是**这一台实际用的根**（登记文件所在目录），不是某个
+// 目录名：以前这条写死 `.sidecar-data`，于是 `--state-dir=<临时目录>` 的合法隔离反而被判红。
+// 实测真相：`--state-dir` + `--desktop-dir` + `--isolate-home` 下，path 是 `<临时>/data/scheduled_tasks.json`，
+// 确实落在隔离根里面——红的是我的口径，不是内核的落盘。
+const isolatedRoot = dirname(infoPath).replace(/\\/g, '/').toLowerCase()
+const persistPath = (status0.persistence?.path ?? '').replace(/\\/g, '/').toLowerCase()
 check('persistence path stays inside the isolated dir',
-  (status0.persistence?.path ?? '').includes('.sidecar-data'), status0.persistence?.path ?? '')
+  persistPath.length > 0 && persistPath.startsWith(isolatedRoot), `${status0.persistence?.path ?? '（无 path）'} ∉ ${isolatedRoot}`)
 
 const before = await api.listScheduledTasks()
 console.log(`\ntasks before: ${before.length}`)
@@ -58,7 +64,7 @@ check('PATCH preserved identity and lifecycle (id/createdAt/status untouched)',
 
 await api.pauseScheduleTask(created.id)
 const paused = (await api.listScheduledTasks()).find((t) => t.id === created.id)
-check('pause moved lifecycle to paused', effectiveStatus(paused ?? { ...created, status: undefined, enabled: false }) === 'paused',
+check('pause moved lifecycle to paused', effectiveStatus(paused ?? { ...created, enabled: false }) === 'paused',
   `status=${paused?.status ?? '—'} enabled=${paused?.enabled ?? '—'}`)
 
 // Status filter is a view convenience: an invalid value must not blank the list.

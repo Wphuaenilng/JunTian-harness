@@ -24,7 +24,9 @@ export interface CronTrigger {
 
 /** scheduled-task-model.ts:16 */
 export interface ScheduledTaskRetry {
-  attempts?: number
+  /** 线上只有 `maxAttempts`：内核 `normalizeRetry`（scheduled-task-model.ts:168-177）只读这个键，
+   *  写成 `attempts` 会被整条丢掉（重试策略静默不生效）。 */
+  maxAttempts?: number
   backoffMs?: number
   [k: string]: unknown
 }

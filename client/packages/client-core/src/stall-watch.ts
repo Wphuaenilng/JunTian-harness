@@ -28,6 +28,6 @@ export function isStalled(watch: StallWatch, seqNow: number, elapsedMs: number):
  * acknowledged it as a lane and its turn has not come yet, so warning there would be
  * a false alarm about input the user can already see is parked.
  */
-export function shouldArmStall(accepted: 'ok' | 'busy' | 'conflict' | 'error'): boolean {
+export function shouldArmStall(accepted: 'ok' | 'busy' | 'conflict' | 'error' | 'queued' | 'lost'): boolean {
   return accepted === 'ok'
 }

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>天枢 · 上下文组件探针</title>
+</head>
+<body>
+  <!-- Developer page, not product surface: it mounts the real <ContextPanel> gauge and feeds it the
+       drawing's own budget numbers, so a headless browser measures the rendered readouts instead of
+       trusting the pure helpers. Built as a second vite input; nothing links to it.
+       Measured by `node scripts/check-live-geometry.mjs` (the gauge rows). -->
+  <div id="root"></div>
+  <pre id="out"></pre>
+  <script type="module" src="/src/ctx-probe.tsx"></script>
+</body>
+</html>

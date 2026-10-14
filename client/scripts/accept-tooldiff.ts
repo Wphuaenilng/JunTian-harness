@@ -20,8 +20,8 @@ import { looksLikePatch, parseUnifiedDiff, diffStats } from '../packages/ui-prim
 import { relativeToCwd, SessionModel, SidecarClient, type Block } from '../packages/client-core/src/index.ts'
 
 const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const info = JSON.parse(readFileSync(resolve(clientRoot, '.sidecar-info.json'), 'utf8')) as { baseUrl: string; token: string }
-const api = new SidecarClient({ baseUrl: info.baseUrl, token: info.token })
+import { openInstance } from './lib-instance.ts'
+const { api, info } = openInstance('工具卡的改前视图 + 真 diff（回放历史事件，零花费）')
 
 const failures: string[] = []
 const check = (label: string, ok: boolean, detail = ''): void => {

@@ -5,6 +5,7 @@ import { loadBefore, resolveAsk, type BeforeState } from './before-view.ts'
 import { useT } from '@tianshu/locale'
 
 export { ContextPanel, type ContextPanelProps } from './context-panel.tsx'
+export { contextPercentOf } from './context-geometry.ts'
 
 export interface ChatStreamProps {
   blocks: readonly Block[]
@@ -70,11 +71,20 @@ type Ctx = { api?: SidecarClient | undefined; sessionId?: string | undefined; cw
 
 // Subscribing per block rather than threading `t` down means memo() still short-circuits
 // on unchanged blocks, and a language flip reaches every block that is memoised out.
+/**
+ * Counting seam for the render-face probe (`/bubble-probe.html`): how many `BlockView` bodies
+ * actually ran. Same shape as `markdownParseCount` — one integer increment, no allocation, and
+ * nothing in the product reads it. The comment above is a claim about `memo()`; without this seam
+ * there was no way to tell it from a claim that stopped being true.
+ */
+export const blockRenderCount = { renders: 0 }
+
 const BlockView = memo(function BlockView({ block, ...ctx }: { block: Block } & Ctx) {
+  blockRenderCount.renders += 1
   const t = useT()
   switch (block.kind) {
     case 'user':
-      return <div className="uc__row"><div className="uc__bubble">{block.text}</div></div>
+      return <div className="uc__row uc__row--me"><div className="uc__bubble">{block.text}</div></div>
     case 'text':
       return <div className="uc__row"><MarkdownBlock id={block.id} source={block.text} open={block.open} /></div>
     case 'thinking':

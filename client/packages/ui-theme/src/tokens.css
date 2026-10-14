@@ -33,6 +33,10 @@
   --violet-400: #A78BFA;
 
   /* Semantic aliases — components consume these, never a raw ramp value. */
+  /* 2026-10-12 裁定 ①：AA 是硬门，所以凡"引用某个 ramp 成员就到不了 4.5:1"的语义 token，
+     都在这里带上自己的值，而不是去改 ramp 成员本身——ramp 是品牌层（钧天那 9 值锁死），
+     而这两个关切不同：品牌色是"看起来像谁"，语义色是"读不读得出来"。
+     下面几枚的数由 `check-contrast` 打印的最小改法给出（同 H/S/alpha、只挪 L），改完门自己复验。 */
   --bg-base: var(--nb-00);
   --bg-sidebar: var(--nb-50);
   --bg-hover: rgba(38, 49, 72, .06);
@@ -44,19 +48,64 @@
   --border-l2: rgba(0, 0, 0, .10);
   --label-primary: var(--nb-1000);
   --label-secondary: var(--nb-700);
-  --label-tertiary: var(--nb-600);
-  --label-caption: var(--nb-400);
-  --accent: var(--ds-500);
-  --ok: var(--green-500);
-  --danger: var(--red-600);
-  --warn: var(--amber-600);
+  --label-tertiary: #6f737a;
+  --label-caption: #6b727b;
+  --accent: #336ce4;
+  --ok: #178841;
+  --danger: #e71313;
+  --warn: #a9641b;
+  /* 2026-10-12 裁定 ①：「软底色 / on-accent」一族。它们存在的理由是**这些位置原先只能写十六进制字面量**——
+     等值的语义 token 不存在，于是一层红在六个文件里各写一遍，暗色还完全不跟（`--danger` 改了它不动）。
+     一条测出来的结构事实决定了这一族的形状：**同色相的"文字 + 浅底"到不了 4.5:1**
+     （#e71313 在白上 4.67、在 #FEF5F6 上就掉到 4.36）——所以软底上的文字走墨色，色相由底色与描边承担；
+     diff 那两行保留色相文字，代价是底色极浅、文字比 `--ok`/`--danger` 更深（下面各值都由
+     `check-contrast` 双面复验，不是手挑）。 */
+  --danger-soft: #FCE8E9;
+  --diff-add-bg: #E7F6EE;
+  --diff-add-text: #0F7A38;
+  --diff-del-bg: #FCE9E9;
+  --diff-del-text: #C81E1E;
+  --on-accent: #FFFFFF;
+  /* 选中/开启那一档的表面：浅色沿用品牌淡蓝（逐值等价，不改今天的观感），
+     暗色必须是深色——`--ds-100` 在暗色里没有覆写，白底压近白字量出来是 **1.07:1，等于看不见**。 */
+  --bg-selected: var(--ds-100);
   --shadow-lv2: 0 4px 12px 0 rgba(0, 0, 0, .02), 0 2px 8px 0 rgba(0, 0, 0, .04);
 
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --font-code: 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, 'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei';
 
   /* Centered narrow column of the 定稿 layout — the document-flow reading measure. */
-  --measure: 720px;
+  --measure: 748px;
+  /* 图上窄栏 748 与底部停靠区 780 是两个数（composer 卡比对话列略宽），照抄：
+     两处共用一个 token 会让其中一边永远对不上图。 */
+  --scale-dock-width: 780px;
+  /* 定稿图的尺寸刻度。存在的理由是一个已经发生过的根因：mockup 里这些数全是硬编码字面量，
+     所以没有任何东西把界面钉在图上——改完还会漂，门也只能手挑锚点。这里把它们变成唯一事实源，
+     CSS 一律 var() 取用，`check:scale` 再逐个对回 HTML 源稿。
+     --scale-titlebar 目前**没有消费者**：2026-10-12 裁定不做自绘标题栏（要它得 frame:false + 一条窄 preload，
+     特权面改动），所以这枚 token 只记录图上的数，故意留白。 */
+  --scale-titlebar: 40px;
+  --scale-brand-row: 60px;
+  --scale-brand-mark: 28px;
+  --scale-mark-radius: 8px;
+  --scale-project-row: 34px;
+  --scale-project-mark: 20px;
+  --scale-session-row: 32px;
+  --scale-rail-collapsed: 44px;
+  --scale-rail-open: 288px;
+  /* 收起态那 44px 细条里的两枚数，来自第二张定稿图（源稿 .rail-btn / .rail-btn .mini）：
+     36px 见方的图标钮与 6px 角点。钮数不是刻度量，所以不进表。 */
+  --scale-rail-btn: 36px;
+  --scale-rail-mini: 6px;
+  --scale-statusbar: 26px;
+  --scale-composer-radius: 22px;
+  /* 图上 `.ububble` 与 `.composer` 各自写着 22px：是两个声明点，就两个 token——合成一枚的话，
+     改 composer 圆角会把用户气泡一起带走，而图上那两条本来互不相关。`check:scale` 逐枚对回源稿。 */
+  --scale-bubble-radius: 22px;
+  /* 图上 `.cm-send` 是 34×34 的圆形图形钮（源稿 font-size:14px 的 ➤）。 */
+  --scale-send-size: 34px;
+  --scale-card-radius: 12px;
+  --scale-group-head: 36px;
   --sidebar-width: 264px;
   --statusbar-height: 28px;
 }
@@ -83,5 +132,16 @@
   --label-caption: #7A8089;
   --accent: var(--ds-400);
   --warn: var(--amber-400);
+  /* 浅色那两枚要往深里挪才够 4.5:1，暗色要反过来往亮里挪：同一个字面值满足不了两个主题
+     （`:root` 只定义一次、暗色块原先没覆写它们），所以这两条按主题分叉，门两面各验一次。 */
+  --danger: #ef3939;
+  --ok: #199547;
+  /* 这一族在暗色里是"深底 + 亮字"，与浅色的"浅底 + 深字"是两回事，所以逐条给值而不是靠 alpha 蒙。 */
+  --danger-soft: #33161A;
+  --diff-add-bg: #123024;
+  --diff-add-text: #4ADE80;
+  --diff-del-bg: #33161A;
+  --diff-del-text: #F87171;
+  --bg-selected: #22304A;
   --shadow-lv2: 0 4px 12px 0 rgba(0, 0, 0, .30), 0 2px 8px 0 rgba(0, 0, 0, .40);
 }

@@ -11,12 +11,11 @@ import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { SidecarClient, SessionModel, openSessionStream } from '../packages/client-core/src/index.ts'
+import { openInstance } from './lib-instance.ts'
 
 const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = resolve(clientRoot, '..')
-const info = JSON.parse(readFileSync(join(clientRoot, '.sidecar-info.json'), 'utf8')) as { baseUrl: string; token: string }
-
-const api = new SidecarClient({ baseUrl: info.baseUrl, token: info.token })
+const { api, info } = openInstance('M0/M1 端到端流式（发消息 → 看 text_delta → turn_complete）', { spends: true })
 const health = await api.health()
 if (!health.configured) {
   console.error('✗ provider key not configured — refusing (no point burning a fake run)')
@@ -28,7 +27,7 @@ if (!health.configured) {
 // default the process falls back to (observed: an unrelated provider's model id, which
 // then fails to resolve under this provider).
 const modelFlag = process.argv.indexOf('--model')
-const modelArg = modelFlag >= 0 ? process.argv[modelFlag + 1] : 'deepseek-flash'
+const modelArg = (modelFlag >= 0 ? process.argv[modelFlag + 1] : 'deepseek-flash') ?? 'deepseek-flash'
 
 const session = await api.createSession({
   cwd: repoRoot,

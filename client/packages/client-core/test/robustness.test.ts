@@ -1,7 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { SessionModel } from '../src/session-model.ts'
-import type { SessionEvent, StreamedEvent } from '../src/protocol-types.ts'
+import type { SessionEvent } from '../src/protocol-types.ts'
+import type { StreamedEvent } from '../src/session-stream.ts'
+import { categorize } from '../src/event-category.ts'
 
 /**
  * Plan §7's mitigation for "no formal API docs, future breaking changes" ends with three
@@ -16,7 +18,8 @@ import type { SessionEvent, StreamedEvent } from '../src/protocol-types.ts'
  */
 const ev = (seq: number, type: string, data: Record<string, unknown>): SessionEvent =>
   ({ seq, ts: 0, type: type as SessionEvent['type'], data })
-const streamed = (event: SessionEvent): StreamedEvent => ({ event } as unknown as StreamedEvent)
+const streamed = (event: SessionEvent): StreamedEvent =>
+  ({ event, category: categorize(event.type), generation: 1, phase: 'live' })
 
 test('an unknown event type advances the cursor and is kept as a raw snapshot, never a crash', () => {
   const s = new SessionModel()

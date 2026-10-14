@@ -6,12 +6,17 @@ import {
   shouldOfferEarlier,
   PROTOCOL_VERSION,
   openSessionStream,
+  type ReplayGap,
   openServerEvents,
   categorize,
   formatCockpit,
+  tokensPerSecond,
+  formatThroughput,
   isStalled,
   shouldArmStall,
+  createLatestGate,
   type CockpitSnapshot,
+  type ThroughputSample,
   type SessionRecord,
   type SessionSearchHit,
   type HealthBody,
@@ -19,8 +24,11 @@ import {
   type EventCategory,
   type StreamPhase,
 } from '@tianshu/client-core'
+// 快照键由 client-core 命名（§4.1：产品面不写协议事件名），这里只取键与读取器。
+import { SNAP, snapshotOf } from '@tianshu/client-core'
 import { SessionList } from '@tianshu/ui-session'
-import { ChatStream, ContextPanel } from '@tianshu/ui-chat'
+import { SectionGroup, submitsOnEnter } from '@tianshu/ui-primitives'
+import { ChatStream, ContextPanel, contextPercentOf } from '@tianshu/ui-chat'
 import { ApprovalPanel } from '@tianshu/ui-approval'
 import { SettingsPanel } from '@tianshu/ui-settings'
 import { CheckpointPanel, GitPanel } from '@tianshu/ui-git'
@@ -38,17 +46,25 @@ const EMPTY_COUNTS: Record<EventCategory, number> = { lifecycle: 0, text: 0, too
 /** cockpit `compactionState` values that mean "nothing to report" (observed: ready, healthy). */
 const CALM_COMPACTION_STATES = new Set(['ready', 'healthy', 'idle', 'none'])
 
-const RAIL_TABS: Array<{ id: RightTab; labelKey: LocaleKey }> = [
-  { id: 'settings', labelKey: 'app.tabSettings' },
-  { id: 'context', labelKey: 'app.tabContext' },
-  { id: 'checkpoints', labelKey: 'app.tabCheckpoints' },
-  { id: 'git', labelKey: 'app.tabGit' },
-  { id: 'automations', labelKey: 'app.tabAutomations' },
-  { id: 'files', labelKey: 'app.tabFiles' },
+/**
+ * The collapsed rail's icons (定稿 第二张图 `.d-rail`): one glyph per group, and clicking one
+ * opens that group *and* expands the rail — the strip is a jump target, not just an open button.
+ * `◔` and `↩` are the drawing's own characters for 上下文 / 检查点; the other four are ours
+ * because the drawing only drew four of our six groups.
+ */
+const RAIL_TABS: Array<{ id: RightTab; labelKey: LocaleKey; glyph: string }> = [
+  { id: 'settings', labelKey: 'app.tabSettings', glyph: '⚙' },
+  { id: 'context', labelKey: 'app.tabContext', glyph: '◔' },
+  { id: 'checkpoints', labelKey: 'app.tabCheckpoints', glyph: '↩' },
+  { id: 'git', labelKey: 'app.tabGit', glyph: '⑄' },
+  { id: 'automations', labelKey: 'app.tabAutomations', glyph: '⏱' },
+  { id: 'files', labelKey: 'app.tabFiles', glyph: '▤' },
 ]
 
 /** Kept as key + raw message so an on-screen banner re-renders when the language flips. */
 type Failure = { key: LocaleKey; message: string; seconds?: number }
+
+const NO_SEARCH_META: { scannedFiles: number | null; tooShort: boolean } = { scannedFiles: null, tooShort: false }
 
 /**
  * How long a send may sit with no event at all before the client says so. The kernel's
@@ -81,6 +97,28 @@ export function App() {
   const lastSeq = useStore(view, (s) => s.lastSeq)
   const rightOpen = useStore(view, (s) => s.panels.right)
   const rightTab = useStore(view, (s) => s.rightTab)
+  /**
+   * The right rail is a stack of collapsible groups (定稿 设计要点「折叠组右栏」), not mutually
+   * exclusive tabs. `rightTab` stays in the store — it already persisted, and its meaning carries
+   * over as "the group opened last", which is what a reload should restore. Which groups are open
+   * right now is view-local: several can be open at once, and that is not something to persist.
+   * A group's panel mounts the first time it opens and stays mounted after, so six panels never
+   * stampede the sidecar on every session switch while a collapsed-and-reopened group keeps its state.
+   */
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<RightTab>>(() => new Set<RightTab>([rightTab]))
+  const [mountedGroups, setMountedGroups] = useState<ReadonlySet<RightTab>>(() => new Set<RightTab>([rightTab]))
+  const setGroupOpen = useCallback((id: RightTab, next: boolean): void => {
+    setOpenGroups((prev) => {
+      const out = new Set(prev)
+      if (next) out.add(id)
+      else out.delete(id)
+      return out
+    })
+    if (next) {
+      setMountedGroups((prev) => (prev.has(id) ? prev : new Set(prev).add(id)))
+      view.setState({ rightTab: id })
+    }
+  }, [view])
   const draft = useStore(view, (s) => (s.openSessionId ? s.drafts[s.openSessionId] ?? '' : ''))
 
   const [sessions, setSessions] = useState<readonly SessionRecord[]>([])
@@ -91,7 +129,15 @@ export function App() {
   // view store (which holds the things that must survive a remount).
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<readonly SessionSearchHit[] | null>(null)
+  const [searchMeta, setSearchMeta] = useState<{ scannedFiles: number | null; tooShort: boolean }>(NO_SEARCH_META)
   const [searchPending, setSearchPending] = useState(false)
+  // One gate per host mount: the newest search request is the only one allowed to write state.
+  const searchGate = useMemo(() => createLatestGate(), [])
+  // 冷通道"加载更早"那一槽同理：换会话时旧那一发只许丢弃（见 loadEarlier）。
+  const historyGate = useMemo(() => createLatestGate(), [])
+  // 会话名册的读回只许最新那一发落地：归档 / 取消归档 / 改名各发一发，旧的那发后落地就会把
+  // 刚归档的那行显示回未归档——看起来像"点了没生效"。
+  const rosterGate = useMemo(() => createLatestGate(), [])
   const [loadingEarlier, setLoadingEarlier] = useState(false)
   const [theme, setTheme] = useState<ThemeMode>(() => readStoredTheme())
   // The concrete value painted into `data-theme`, held as state so a change re-renders
@@ -101,6 +147,13 @@ export function App() {
   // Cockpit is only answerable while an agent exists for the session (an archived or
   // never-run session 404s), so a failure is "no live cockpit" and not an error band.
   const [cockpit, setCockpit] = useState<CockpitSnapshot | null>(null)
+  // 状态条图上第一格「⚡ 42 tok/s」。内核里没有速度这个字段，所以它是**客户端采样**：
+  // 相邻两次 cockpit 轮询之间新增的 outputTokens ÷ 实测间隔。公式只有一个事实源
+  // （client-core 的 tokensPerSecond），这里只负责取样本和摆放格子。
+  const [speedTps, setSpeedTps] = useState<number | null>(null)
+  const speedSample = useRef<ThroughputSample | null>(null)
+  /** Per-connection verdict from the stream: did resuming actually miss events? */
+  const [replayGap, setReplayGap] = useState<ReplayGap | null>(null)
 
   // Cycle system → light → dark. The boot script in index.html already painted the
   // stored value before first paint; this only keeps React's view of it in sync.
@@ -124,17 +177,30 @@ export function App() {
 
   useEffect(() => {
     const q = query.trim()
-    if (!q) { setHits(null); setSearchPending(false); return }
+    if (!q) { searchGate.invalidate(); setHits(null); setSearchMeta(NO_SEARCH_META); setSearchPending(false); return }
     setSearchPending(true)
+    const token = searchGate.begin()
     // Debounced: every keystroke hitting a disk-scanning endpoint is how search gets
-    // blamed for a laggy sidebar.
+    // blamed for a laggy sidebar. A query shorter than the sidecar accepts never goes out
+    // (it used to come back as a 搜索失败 banner after one character).
+    // The debounce only stops requests that never left; one already in flight for a query the user
+    // has since abandoned (cleared the box, typed past it) still lands and used to write hits back
+    // — over an empty search box. The gate decides who may touch state; the request is not cancelled.
     const timer = setTimeout(() => {
       void api.searchSessions(q)
-        .then((r) => { setHits(r); setSearchPending(false) })
-        .catch((e: Error) => { setBanner({ key: 'app.searchFailed', message: e.message }); setSearchPending(false) })
+        .then((page) => {
+          if (!searchGate.isCurrent(token)) return
+          setHits(page.hits)
+          setSearchMeta({ scannedFiles: page.scannedFiles, tooShort: page.tooShort })
+          setSearchPending(false)
+        })
+        .catch((e: Error) => {
+          if (!searchGate.isCurrent(token)) return
+          setBanner({ key: 'app.searchFailed', message: e.message }); setSearchPending(false)
+        })
     }, 250)
     return () => clearTimeout(timer)
-  }, [api, query])
+  }, [api, query, searchGate])
 
   // The Session instance is state, not a ref: useSyncExternalStore must re-subscribe
   // when a different session's model takes over, and a ref swap would leave it
@@ -146,18 +212,33 @@ export function App() {
 
   // Offered only when the server's own replay_window says the disk log has a head we
   // were not given — never a guessed threshold.
-  const offerEarlier = shouldOfferEarlier(state.snapshots.replay_window)
+  const offerEarlier = shouldOfferEarlier(snapshotOf(state.snapshots, SNAP.replayWindow))
+  // The collapsed rail's 上下文 icon puts this number in its tooltip. It comes from the same
+  // algebra as the ring, so the strip and the panel can never read differently; null means no
+  // budget snapshot has arrived yet — then the tooltip says the group name and nothing else.
+  const railContextPct = contextPercentOf(snapshotOf(state.snapshots, SNAP.contextBudget))
 
   // Cockpit reads live-agent state, so it is polled only while this session runs: an
   // archived or never-run session answers 404 (handled as "no live cockpit", not an error
   // band), and polling regardless turns idle browsing into a 404 storm — measured 17 of 39
   // requests in one pass over the panels.
   useEffect(() => {
-    if (!openSessionId || !state.running) { setCockpit(null); return }
+    if (!openSessionId || !state.running) { setCockpit(null); setSpeedTps(null); speedSample.current = null; return }
+    // 换会话、或这一轮跑完之后又跑起来，都要把基线清掉：留着上一份样本，第一格就会把
+    // 跨会话（或跨空闲期）的 token 差除以一段根本没在产出的时间。
+    speedSample.current = null
     let stopped = false
     const pull = (): void => {
-      api.cockpit(openSessionId).then((c) => { if (!stopped) setCockpit(c) }).catch(() => {
-        if (!stopped) setCockpit(null)
+      api.cockpit(openSessionId).then((c) => {
+        if (stopped) return
+        // 时间戳取响应落地那一刻，不取定时器 firing 那一刻——轮询慢的那几秒是真实发生的，
+        // 拿固定的 10s 当分母就会把它抹掉。
+        const next: ThroughputSample = { outputTokens: c.model.outputTokens, atMs: Date.now() }
+        setSpeedTps(tokensPerSecond(speedSample.current, next))
+        speedSample.current = next
+        setCockpit(c)
+      }).catch(() => {
+        if (!stopped) { setCockpit(null); setSpeedTps(null); speedSample.current = null }
       })
     }
     pull()
@@ -169,20 +250,25 @@ export function App() {
     const oldest = model.current.oldestSeq
     if (oldest <= 1) return
     setLoadingEarlier(true)
+    const token = historyGate.begin()
+    // 换会话或又点一次之后，旧那一发只许丢弃：它若照旧写回，`.finally` 会把**新会话**那发的
+    // "加载中" spinner 提前关掉——spinner 说"完了"而尾段还在网上飞。
     void api.historyPage(openSessionId, oldest, 200)
-      .then((page) => model.prependEvents(page.events))
-      .catch((e: Error) => setBanner({ key: 'app.historyFailed', message: e.message }))
-      .finally(() => setLoadingEarlier(false))
-  }, [api, model, openSessionId])
+      .then((page) => { if (historyGate.isCurrent(token)) model.prependEvents(page.events) })
+      .catch((e: Error) => { if (historyGate.isCurrent(token)) setBanner({ key: 'app.historyFailed', message: e.message }) })
+      .finally(() => { if (historyGate.isCurrent(token)) setLoadingEarlier(false) })
+  }, [api, model, openSessionId, historyGate])
 
   const refreshSessions = useCallback(async () => {
+    const token = rosterGate.begin()
     try {
       const { includeArchived: showArchived } = view.getState()
-      setSessions(await api.listSessions(showArchived ? { includeArchived: true } : undefined))
+      const list = await api.listSessions(showArchived ? { includeArchived: true } : undefined)
+      if (rosterGate.isCurrent(token)) setSessions(list)
     } catch (e) {
-      setBanner({ key: 'app.loadSessionsFailed', message: (e as Error).message })
+      if (rosterGate.isCurrent(token)) setBanner({ key: 'app.loadSessionsFailed', message: (e as Error).message })
     }
-  }, [api, view])
+  }, [api, rosterGate, view])
 
   const setConnection = useCallback((p: StreamPhase | 'idle') => view.setState({ connection: p }), [view])
 
@@ -242,21 +328,33 @@ export function App() {
     setModel(m)
     setCounts(EMPTY_COUNTS)
     view.setState({ lastSeq: 0, generation: 0 })
+    // 上一会话那发还在飞的"更早"从此不许写回，spinner 也不能由它来关。
+    historyGate.invalidate()
+    setLoadingEarlier(false)
 
     // Cold start order (plan §4.3 #1): REST approvals are ground truth for pending
     // gates, then the stream replays the window.
     void api.interventions(openSessionId)
       .then((snap) => m.applySnapshot(snap))
       .catch(() => undefined)
+    setReplayGap(null)
 
     const close = openSessionStream({
       baseUrl: API_BASE,
       token: '',
       sessionId: openSessionId,
       since: 0,
+      onGap: (g) => { if (g.kind !== 'none') setReplayGap(g) },
+      // §4.3 #2 的 REST 兜底：断线退避到第 2 次起，先拿游标去问落盘日志要尾段。传输层把它当回放
+      // 投给模型并推进自己的游标，所以通道回来后 `?since=` 不会把这批 seq 再投一遍。
+      pullRest: (since) => api.events(openSessionId, since).then((p) => p.events),
       onEvent: (ev) => {
         disarmStall()
-        tally.record(ev.event.type)
+        // 状态条的「分类计数」统计的是**这会话里真发生过的事**。seq=0 是连接期的合成元事件
+        // （实测一开流就有 4 条：replay_window / delegation_snapshot / job_snapshot /
+        // approval_snapshot，其中两条归 tool），它们和游标那条规则同源——**不该推计数**，
+        // 否则刚连上一个空会话就显示 `tool 2 · lifecycle 2`，而且每重连一次再加一遍。
+        if (ev.event.seq > 0) tally.record(ev.event.type)
         m.apply(ev)
         view.setState({ lastSeq: m.current.lastSeq, generation: ev.generation })
       },
@@ -279,7 +377,7 @@ export function App() {
     }, APPROVAL_POLL_MS)
 
     return () => { clearInterval(gateTimer); close() }
-  }, [api, disarmStall, openSessionId, tally, setConnection, view])
+  }, [api, disarmStall, historyGate, openSessionId, tally, setConnection, view])
 
   const createSession = useCallback(async () => {
     try {
@@ -301,11 +399,17 @@ export function App() {
     setDraft(view, openSessionId, '')
     const seqAtSend = model.current.lastSeq
     try {
-      const busy = await api.prompt(openSessionId, { prompt: text })
-      if (busy === 'busy') await api.queue(openSessionId, text)
+      const outcome = await api.sendOrQueue(openSessionId, text)
+      if (outcome === 'lost') {
+        // Both endpoints refused in the same breath (a run started, then closed). The draft was
+        // already cleared for optimism — put the text back, or "输入不丢" would be a lie.
+        setDraft(view, openSessionId, text)
+        setBanner({ key: 'app.sendLost', message: '' })
+        return
+      }
       // Only a directly accepted run is a stall candidate: a queued input is parked by
       // design, and warning about it would be a false alarm.
-      if (shouldArmStall(busy)) armStall(seqAtSend)
+      if (shouldArmStall(outcome)) armStall(seqAtSend)
     } catch (e) {
       setBanner({ key: 'app.sendFailed', message: (e as Error).message })
     }
@@ -336,11 +440,14 @@ export function App() {
           onOpen={(id) => view.setState({ openSessionId: id })}
           onCreate={() => void createSession()}
           onArchive={(id) => { void api.archiveSession(id).then(refreshSessions) }}
+          onUnarchive={(id) => { void api.unarchiveSession(id).then(refreshSessions) }}
           onRename={(id, title) => { void api.renameSession(id, title).then(refreshSessions).catch((e: Error) => setBanner({ key: 'app.renameFailed', message: e.message })) }}
           query={query}
           onQueryChange={setQuery}
           hits={hits}
           searchPending={searchPending}
+          searchScanned={searchMeta.scannedFiles}
+          searchTooShort={searchMeta.tooShort}
         />
       </aside>
 
@@ -376,11 +483,11 @@ export function App() {
                   <textarea
                     value={draft}
                     onChange={(e) => { if (openSessionId) setDraft(view, openSessionId, e.target.value) }}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send() } }}
+                    onKeyDown={(e) => { if (submitsOnEnter({ key: e.key, shiftKey: e.shiftKey, isComposing: e.nativeEvent.isComposing })) { e.preventDefault(); void send() } }}
                     rows={1}
                     placeholder={t('app.composerPlaceholder')}
                   />
-                  <button className="app__send" onClick={() => void send()}>{t('app.send')}</button>
+                  <button className="app__send" title={t('app.send')} aria-label={t('app.send')} onClick={() => void send()}>➤</button>
                   <button className="app__ghost" onClick={abort} disabled={!state.running}>{t('app.abort')}</button>
                 </div>
               </div>
@@ -397,61 +504,81 @@ export function App() {
         {rightOpen ? (
           <div className="app__panel">
             <header className="app__panel-head">
-              <nav className="app__tabs">
-                {RAIL_TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    className={`app__tab${rightTab === tab.id ? ' app__tab--on' : ''}`}
-                    onClick={() => view.setState({ rightTab: tab.id })}
-                  >
-                    {t(tab.labelKey)}
-                  </button>
-                ))}
-              </nav>
-              <button className="set__close" onClick={() => view.setState({ panels: { right: false } })}>✕</button>
+              <span className="app__secs-title">{t('app.railGroups')}</span>
+              <button className="app__railclose" onClick={() => view.setState({ panels: { right: false } })}>✕</button>
             </header>
-            <div className="app__panel-body">
-              {rightTab === 'settings' && <SettingsPanel api={api} onClose={() => view.setState({ panels: { right: false } })} />}
-              {rightTab === 'context' && <ContextPanel snapshots={state.snapshots} />}
-              {rightTab === 'checkpoints' && (
-                <CheckpointPanel
-                  api={api}
-                  sessionId={openSessionId}
-                  onRewound={() => { void refreshSessions() }}
-                />
-              )}
-              {rightTab === 'git' && (
-                <GitPanel
-                  api={api}
-                  sessionId={openSessionId}
-                  cwd={sessionCwd}
-                  canMergeBack={typeof session?.worktreeBranch === 'string' && session.worktreeBranch !== ''}
-                />
-              )}
-              {rightTab === 'automations' && (
-                <AutomationBoard
-                  api={api}
-                  canPatch={health?.capabilities.schedulePatch === true}
-                  defaultCwd={sessionCwd}
-                />
-              )}
-              {rightTab === 'files' && (
-                <FileBrowser
-                  api={api}
-                  sessionId={openSessionId}
-                  onPick={(p) => { if (openSessionId) setDraft(view, openSessionId, `${draft}${draft && !draft.endsWith(' ') ? ' ' : ''}@${p} `) }}
-                />
-              )}
+            <div className="app__panel-body app__secs">
+              {RAIL_TABS.map((g) => (
+                <SectionGroup
+                  key={g.id}
+                  id={g.id}
+                  title={t(g.labelKey)}
+                  open={openGroups.has(g.id)}
+                  onOpenChange={(next) => setGroupOpen(g.id, next)}
+                >
+                  {mountedGroups.has(g.id) && g.id === 'settings' && <SettingsPanel api={api} onClose={() => view.setState({ panels: { right: false } })} />}
+                  {mountedGroups.has(g.id) && g.id === 'context' && (
+                    <ContextPanel
+                      snapshots={state.snapshots}
+                      onRetract={(laneId) => { if (openSessionId !== null) void api.retractQueued(openSessionId, laneId) }}
+                    />
+                  )}
+                  {mountedGroups.has(g.id) && g.id === 'checkpoints' && (
+                    <CheckpointPanel
+                      api={api}
+                      sessionId={openSessionId}
+                      onRewound={() => { void refreshSessions() }}
+                    />
+                  )}
+                  {mountedGroups.has(g.id) && g.id === 'git' && (
+                    <GitPanel
+                      api={api}
+                      sessionId={openSessionId}
+                      cwd={sessionCwd}
+                      canMergeBack={typeof session?.worktreeBranch === 'string' && session.worktreeBranch !== ''}
+                    />
+                  )}
+                  {mountedGroups.has(g.id) && g.id === 'automations' && (
+                    <AutomationBoard
+                      api={api}
+                      canPatch={health?.capabilities.schedulePatch === true}
+                      defaultCwd={sessionCwd}
+                    />
+                  )}
+                  {mountedGroups.has(g.id) && g.id === 'files' && (
+                    <FileBrowser
+                      api={api}
+                      sessionId={openSessionId}
+                      onPick={(p) => { if (openSessionId) setDraft(view, openSessionId, `${draft}${draft && !draft.endsWith(' ') ? ' ' : ''}@${p} `) }}
+                    />
+                  )}
+                </SectionGroup>
+              ))}
             </div>
           </div>
         ) : (
-          <button
-            className="app__railbtn"
-            title={t('app.expandRail')}
-            onClick={() => view.setState({ panels: { right: true } })}
-          >
-            {t('app.railLabel')}
-          </button>
+          <nav className="app__railstrip" aria-label={t('app.railLabel')}>
+            <button
+              className="app__railexpand"
+              title={t('app.expandRail')}
+              aria-label={t('app.expandRail')}
+              onClick={() => view.setState({ panels: { right: true } })}
+            >
+              «
+            </button>
+            {RAIL_TABS.map((g) => (
+              <button
+                key={g.id}
+                className="app__railbtn"
+                title={g.id === 'context' && railContextPct !== null ? `${t(g.labelKey)} ${railContextPct}%` : t(g.labelKey)}
+                aria-label={t(g.labelKey)}
+                onClick={() => { setGroupOpen(g.id, true); view.setState({ panels: { right: true } }) }}
+              >
+                {g.glyph}
+                {g.id === 'context' && railContextPct !== null && <span className="app__railmini" aria-hidden="true" />}
+              </button>
+            ))}
+          </nav>
         )}
       </aside>
 
@@ -459,15 +586,26 @@ export function App() {
         <span><i className={`app__dot app__dot--${connection}`} />{phaseLabel(t, connection)}</span>
         <span>gen {generation}</span>
         <span>seq {lastSeq}</span>
+        {/* §9 MVP 那一格「续读起点高于游标」的可见化：判定成立才显示，而且分两种口径——
+            环里没了但磁盘里还有的是"可以加载更早"，不是"丢了"。判据在 client-core/replay-gap.ts
+            （合并回放带 streamStartSeq，所以 seq 跳跃本身不算证据）。 */}
+        {replayGap && replayGap.kind !== 'none' && (
+          <span className={`app__gap app__gap--${replayGap.kind}`}>
+            {t(replayGap.kind === 'lost' ? 'status.gapLost' : 'status.gapDisk', { count: replayGap.to - replayGap.from + 1 })}
+          </span>
+        )}
         <span>{Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(' · ')}</span>
         <span className="app__grow" />
-        {/* 定稿底部状态条：上下文 / 缓存命中 / 成本。仅在有 live agent 时有值——
-            归档或从未跑过的会话 404，此时整块不渲染而不是显示 0。 */}
+        {/* 定稿底部状态条：速度 / 上下文 / 缓存命中 / 成本。整块只在有 live agent 时有值——
+            归档或从未跑过的会话 404，那时不渲染而不是显示 0。速度那一格还要再晚一拍：
+            两次轮询才成一个数，第一次没有读数就整格不出现（同样不是显示 0）。 */}
         {cockpit && (() => {
           const c = formatCockpit(cockpit)
+          const speed = formatThroughput(speedTps)
           return (
             <span className="app__cockpit">
               <b>{c.model}</b>
+              {speed && <span className="app__speed">⚡ {speed}</span>}
               <span>{t('app.context')} {c.contextLabel}</span>
               <span className={c.cachePct >= 80 ? 'app__cache--good' : ''}>{t('app.cacheHit')} {c.cachePct}%</span>
               <span>{c.tokensLabel}</span>

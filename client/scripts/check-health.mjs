@@ -15,12 +15,17 @@ import { fileURLToPath } from 'node:url'
 
 const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const EXPECTED_PROTOCOL_VERSION = 1
+// `--info=<path>`：验法必须能说清"我读的是哪一台"。默认仍指向 `pnpm sidecar` 写的那份登记文件
+// （这条是给人用的手动探针，不该强迫每次都带旗标），但**来源打进输出**——否则一次对旧实例的
+// 成功会被读成"当前这台没问题"（本会话已经为这类假阳性修过 verify-*）。
+const infoArg = process.argv.slice(2).find((a) => a.startsWith('--info='))
+const infoPath = infoArg ? resolve(infoArg.slice('--info='.length)) : join(clientRoot, '.sidecar-info.json')
 
 function loadInfo() {
   try {
-    return JSON.parse(readFileSync(join(clientRoot, '.sidecar-info.json'), 'utf8'))
+    return JSON.parse(readFileSync(infoPath, 'utf8'))
   } catch {
-    throw new Error('no .sidecar-info.json — run: node scripts/launch-sidecar.mjs')
+    throw new Error(`读不到登记文件 ${infoPath} — 先跑 node scripts/launch-sidecar.mjs，或显式 --info=<state-dir>/.sidecar-info.json`)
   }
 }
 
@@ -43,6 +48,7 @@ const rest = await fetch(`${info.baseUrl}/sessions`, {
 const headerProtocol = Number(rest.headers.get('x-tianshu-protocol') ?? 0)
 
 const lines = [
+  `info file      ${infoPath}`,
   `sidecar        ${info.baseUrl}  pid=${info.pid}`,
   `version        ${health.version}`,
   `readiness      ${health.readiness}`,

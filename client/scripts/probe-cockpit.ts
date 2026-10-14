@@ -38,7 +38,7 @@ while (!done && Date.now() - started < 90_000) {
   await new Promise((r) => setTimeout(r, 2500))
   try {
     const c = await api.cockpit(session.id)
-    captured.push({ at: `+${Date.now() - started}ms`, body: c })
+    captured.push({ at: `+${Date.now() - started}ms`, body: { ...c } })
   } catch (e) {
     console.log(`  cockpit ${Math.round((Date.now() - started) / 1000)}s → ${(e as Error).message}`)
   }

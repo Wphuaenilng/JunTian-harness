@@ -3,11 +3,16 @@
  *
  * Verified against a live runtime (not assumed): frames are `event: hello` with
  * `{kind:'hello', heartbeatMs:5000}` followed by `event: health` every 5 seconds
- * carrying the full HealthBody. It has no `seq` and no replay semantics, so it is
+ * carrying the full HealthBody. That reading is no longer a hand-run note — it is a
+ * standing judgement now: `scripts/verify-rest-surface.mjs` derives this exact call
+ * site from source, opens the stream against a keyless sidecar, and asserts the first
+ * two frames are `hello` then `health` (plus a 401 when the token is missing).
+ * It has no `seq` and no replay semantics, so it is
  * NOT the session timeline: it is a liveness + invalidation signal. sessionCount
  * and runningCount on that heartbeat are what tell the sidebar to re-read /sessions.
  */
 import type { HealthBody } from './sidecar-client.ts'
+import { forEachSseFrame } from './sse-frames.ts'
 
 export type ServerEvent =
   | { kind: 'hello'; ts: number; heartbeatMs: number }
@@ -36,26 +41,16 @@ export function openServerEvents(opts: ServerEventsOptions): () => void {
         if (!res.ok || !res.body) throw new Error(`/events → ${res.status}`)
         opts.onPhase?.('live')
         backoff = 500
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buf = ''
-        while (!cancelled) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buf += decoder.decode(value, { stream: true })
-          let idx: number
-          while ((idx = buf.indexOf('\n\n')) >= 0) {
-            const frame = buf.slice(0, idx)
-            buf = buf.slice(idx + 2)
-            const data = frame.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5).trimStart()).join('\n')
-            if (!data) continue
-            try {
-              opts.onEvent?.(JSON.parse(data) as ServerEvent)
-            } catch {
-              // Unknown frame shape: keep the connection, drop the frame.
-            }
+        // 分帧走两条流共用的那一份（`sse-frames.ts`）。这里的判定与 `readSse` **必须不同**：
+        // 全局流的帧是 `{kind, ts, …}`，没有 `seq`，也没有回放语义——它是一次心跳信号，不是时间线。
+        await forEachSseFrame(res.body, controller.signal, (data) => {
+          if (cancelled) return
+          try {
+            opts.onEvent?.(JSON.parse(data) as ServerEvent)
+          } catch {
+            // Unknown frame shape: keep the connection, drop the frame.
           }
-        }
+        })
       } catch {
         if (cancelled) return
       }

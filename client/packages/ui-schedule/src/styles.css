@@ -10,14 +10,14 @@
 .sc__list { list-style: none; margin: 0; padding: 0; flex-direction: column; gap: 7px; }
 .sc__item { border: 1px solid var(--border-l1); border-radius: 9px; padding: 8px 10px; background: var(--bg-sidebar); }
 .sc__row { display: flex; align-items: baseline; gap: 7px; }
-.sc__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--nb-400); flex: none; }
+.sc__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--label-tertiary); flex: none; }
 .sc__dot--active { background: var(--ok); }
 .sc__dot--paused { background: var(--warn); }
 .sc__dot--stopped { background: var(--label-caption); }
 .sc__prompt { flex: 1; font-size: 12px; color: var(--label-primary); line-height: 1.45; }
 .sc__count { font-family: var(--font-code); font-size: 10.5px; color: var(--label-caption); }
 .sc__meta { display: flex; flex-wrap: wrap; gap: 5px; margin: 5px 0 7px; }
-.sc__meta code { font-family: var(--font-code); font-size: 10px; color: var(--label-tertiary); background: var(--bg-inline-code); border-radius: 4px; padding: 1px 5px; word-break: break-all; }
+.sc__meta code { font-family: var(--font-code); font-size: 10px; color: var(--label-secondary); background: var(--bg-inline-code); border-radius: 4px; padding: 1px 5px; word-break: break-all; }
 .sc__actions { gap: 6px; }
 .sc__new { border-top: 1px solid var(--border-l1); padding-top: 10px; display: flex; flex-direction: column; gap: 7px; }
 .sc__prompt-input, .sc__spec {
@@ -32,3 +32,13 @@
 /* Background-run list (`/tasks`) — definitions above, runs below. */
 .sc__jobs { margin-top: 12px; }
 .sc__jobhead { margin: 0 0 6px; font-weight: 600; }
+
+/* 右栏折叠组只有 288px：这些 flex 子项默认 min-width:auto，长提示词与触发器会把面板撑到探出栏外
+   （实测 .sc__trigger / .sc 274 > 241，且因为父级 overflow 是 visible 而看得见）。逐条允许收缩，
+   不动各自的 flex 比例与固定宽的小元素。 */
+.sc, .sc__row, .sc__item, .sc__prompt, .sc__trigger, .sc__new { min-width: 0; }
+
+/* 触发方式是一排模式切换（间隔/cron/一次性/启动时/文件变更 + 新建按钮）。288px 的右栏里一行放不下，
+   而它是不可换行的 flex 行 —— 实测 .sc__trigger 274 > 241（white-space:normal，所以不是文本没折），
+   溢出还会穿过 visible 祖先一路累计到 details 卡片。允许换行即可，不动按钮尺寸与顺序。 */
+.sc__trigger { flex-wrap: wrap; }

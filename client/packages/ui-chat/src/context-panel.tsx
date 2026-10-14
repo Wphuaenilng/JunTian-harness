@@ -1,25 +1,42 @@
-import { useT } from '@tianshu/locale'
+import { useT, type LocaleKey } from '@tianshu/locale'
+import { SNAP, TYPED_SNAPSHOT_KEYS, type ContextBudgetSnapshot } from '@tianshu/client-core'
+import { budgetSegments, ringFor, sharePercent, usedTokens, RING_RADIUS, type BudgetSegment } from './context-geometry.ts'
+import { laneIsWaiting } from './queue-lane.ts'
+
+/** Row names come from the protocol fields, not from the drawing's 系统提示词/对话历史 labels —
+ *  the snapshot never separates system prompt from history. */
+const SEGMENT_LABEL: Record<BudgetSegment['key'], LocaleKey> = {
+  input: 'ctx.input', tool: 'ctx.tool', reasoning: 'ctx.reasoning', image: 'ctx.image',
+}
 
 export interface ContextPanelProps {
   /** `SessionModel.state.snapshots`: last-wins per event type, keyed by type. */
   snapshots: Readonly<Record<string, Record<string, unknown>>>
+  /**
+   * Take a queued message back out of the queue. Offered only on a lane the fold still shows as
+   * waiting (`laneIsWaiting`), so the panel never offers what the route would answer 409 to.
+   */
+  onRetract: (laneId: string) => void
 }
 
-const str = (d: Record<string, unknown>, k: string): string => (typeof d[k] === 'string' ? d[k] as string : '')
-const num = (d: Record<string, unknown>, k: string): number | null => (typeof d[k] === 'number' && Number.isFinite(d[k]) ? d[k] as number : null)
+/** Snapshot lookups are `| undefined` by nature (the bag holds only what this session reported),
+ *  so the readers take a possibly-missing bag — bracket access with a named key says exactly that,
+ *  which the old `snapshots.phase` dot form silently hid. */
+const str = (d: Record<string, unknown> | undefined, k: string): string => { const v = d?.[k]; return typeof v === 'string' ? v : '' }
+const num = (d: Record<string, unknown> | undefined, k: string): number | null => {
+  const v = d?.[k]
+  return typeof v === 'number' && Number.isFinite(v) ? v : null
+}
 /** kfmt mirrors the cockpit readout's own compactness rule, not a new policy. */
 const kfmt = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n))
 
 /**
- * Snapshots the panel renders with meaning. Anything in `state`/`custom` that is **not**
- * in this set still gets shown — raw, in the last section — because a snapshot nobody
- * renders is a session fact the user cannot see. `todo_state` and friends will land
+ * Snapshots the panel renders with meaning are named by `SNAP` in client-core — the one place the
+ * wire vocabulary may be spelled (plan §4.1: ui-* faces the five categories, not the sidecar's
+ * protocol). Anything NOT in that set still gets shown — raw, in the last section — because a
+ * snapshot nobody renders is a session fact the user cannot see. `todo_state` and friends will land
  * there before they land here, and that is the intended degradation.
  */
-const TYPED = new Set([
-  'context_budget', 'phase', 'status', 'done',
-  'queue_pending', 'queue_status', 'goal_state', 'domain_usage', 'landing', 'hook_result',
-])
 
 /**
  * The runtime-state surface for the open session: the context budget the kernel last
@@ -29,13 +46,13 @@ const TYPED = new Set([
  * (`SessionModel.snapshots`) — no second poll, no extra endpoint, so it can disagree
  * with the cockpit strip but never invent a number.
  */
-export function ContextPanel({ snapshots }: ContextPanelProps) {
+export function ContextPanel({ snapshots, onRetract }: ContextPanelProps) {
   const t = useT()
   const keys = Object.keys(snapshots).sort()
   if (keys.length === 0) return <div className="ucx"><p className="ucx__empty">{t('ctx.empty')}</p></div>
 
-  const budget = snapshots.context_budget
-  const other = keys.filter((k) => !TYPED.has(k))
+  const budget = snapshots[SNAP.contextBudget]
+  const other = keys.filter((k) => !TYPED_SNAPSHOT_KEYS.has(k))
   const rows: Array<{ label: string; value: string }> = []
 
   if (budget) {
@@ -55,14 +72,65 @@ export function ContextPanel({ snapshots }: ContextPanelProps) {
     if (bodyBytes !== null) rows.push({ label: t('ctx.bodyBytes'), value: kfmt(bodyBytes) })
   }
 
-  const phase = snapshots.phase
+  const phase = snapshots[SNAP.phase]
   const restore = phase?.historyRestore as Record<string, unknown> | undefined
   const restored = restore !== undefined ? num(restore, 'restored') : null
-  const pending = snapshots.queue_pending
-  const laneStatus = snapshots.queue_status
+  const pending = snapshots[SNAP.queuePending]
+  const laneStatus = snapshots[SNAP.queueStatus]
+
+  const snap = budget as unknown as ContextBudgetSnapshot | undefined
+  const windowTokens = num(budget ?? {}, 'windowTokens') ?? 0
+  const usedTotal = snap === undefined ? 0 : usedTokens(snap)
+  const ring = budget === undefined ? null : ringFor(usedTotal, windowTokens)
+  const segs = snap === undefined ? [] : budgetSegments(snap)
+
+  /**
+   * 定稿图右栏「上下文占用」那一组：占比环 + 分段条。分段的**名字来自协议字段**而不是图上的
+   * 「系统提示词/对话历史/工具结果」——内核的快照不区分系统提示词与历史，照抄图上的行名等于
+   * 报一个内核从未报告过的分解。缺项就不画那一段，而不是画成 0。
+   */
+  const gauge = ring === null || budget === undefined ? null : (
+    <div className="ucx__gauge">
+      <div className="ucx__ring">
+        <svg width="44" height="44" viewBox="0 0 44 44" role="img" aria-label={t('ctx.ringAria', { percent: ring.percent })}>
+          <circle cx="22" cy="22" r={RING_RADIUS} fill="none" stroke="var(--border-l2)" strokeWidth="2.5" />
+          <circle cx="22" cy="22" r={RING_RADIUS} fill="none" stroke="var(--nb-600)" strokeWidth="2.5"
+            strokeLinecap="round" strokeDasharray={ring.dashArray} strokeDashoffset={ring.dashOffset} />
+        </svg>
+        <span className="ucx__rv">{ring.percent}%</span>
+      </div>
+      <div className="ucx__figs">
+        <div className="ucx__used">{t('ctx.used', {
+          used: kfmt(usedTotal),
+          budget: kfmt(num(budget, 'inputBudget') ?? 0),
+          window: kfmt(windowTokens),
+        })}</div>
+        <div className="ucx__src">{str(budget, 'source') === 'measured' ? t('ctx.sourceMeasured') : t('ctx.sourceEstimate')}</div>
+      </div>
+      {segs.length > 0 && (
+        <>
+          <div className="ucx__bar">
+            {segs.map((s) => (
+              <i key={s.key} className={`ucx__seg ucx__seg--${s.key}`} style={{ width: `${(s.share * 100).toFixed(2)}%` }} />
+            ))}
+          </div>
+          <div className="ucx__legend">
+            {segs.map((s) => (
+              <div className="ucx__lrow" key={s.key}>
+                <span className="ucx__lk"><span className={`ucx__sw ucx__sw--${s.key}`} />{t(SEGMENT_LABEL[s.key])}</span>
+                <span className="ucx__lv">{sharePercent(s.windowShare)} · {kfmt(s.tokens)}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {segs.length === 0 && <p className="ucx__note">{t('ctx.noSegments')}</p>}
+    </div>
+  )
 
   return (
     <div className="ucx">
+      {gauge}
       <div className="ucx__head">
         <h4>{t('ctx.title')}</h4>
         {budget !== undefined && num(budget, 'sampledAt') !== null && (
@@ -108,11 +176,11 @@ export function ContextPanel({ snapshots }: ContextPanelProps) {
         </section>
       )}
 
-      {(snapshots.status || snapshots.done) && (
+      {(snapshots[SNAP.status] || snapshots[SNAP.done]) && (
         <section className="ucx__block">
           <h5 className="ucx__sub">{t('ctx.lifecycle')}</h5>
           <p className="ucx__line">
-            {[snapshots.status ? `status:${str(snapshots.status, 'status')}` : '', snapshots.done ? `done:${str(snapshots.done, 'status')}` : '']
+            {[snapshots[SNAP.status] ? `status:${str(snapshots[SNAP.status], 'status')}` : '', snapshots[SNAP.done] ? `done:${str(snapshots[SNAP.done], 'status')}` : '']
               .filter(Boolean).join(' · ')}
           </p>
         </section>
@@ -124,50 +192,59 @@ export function ContextPanel({ snapshots }: ContextPanelProps) {
           {pending && (
             <p className="ucx__line">
               <code>{t('ctx.lane', { id: str(pending, 'laneId') })}</code> {str(pending, 'text')}
+              {laneIsWaiting(pending, laneStatus) && (
+                <button
+                  className="ucx__retract"
+                  title={t('ctx.retractHint')}
+                  onClick={() => onRetract(str(pending, 'laneId'))}
+                >
+                  {t('ctx.retract')}
+                </button>
+              )}
             </p>
           )}
           {laneStatus && <p className="ucx__line"><code>{str(laneStatus, 'laneId')}</code> → {str(laneStatus, 'status')}</p>}
         </section>
       )}
 
-      {snapshots.goal_state && str(snapshots.goal_state, 'goal') !== '' && (
+      {snapshots[SNAP.goalState] && str(snapshots[SNAP.goalState], 'goal') !== '' && (
         <section className="ucx__block">
           <h5 className="ucx__sub">{t('ctx.goal')}</h5>
-          <p className="ucx__phase">{str(snapshots.goal_state, 'goal')}</p>
+          <p className="ucx__phase">{str(snapshots[SNAP.goalState], 'goal')}</p>
           <p className="ucx__line">
             {t('ctx.goalIteration', {
-              i: num(snapshots.goal_state, 'iteration') ?? 0,
-              max: num(snapshots.goal_state, 'maxIterations') ?? 0,
-              status: str(snapshots.goal_state, 'status'),
+              i: num(snapshots[SNAP.goalState], 'iteration') ?? 0,
+              max: num(snapshots[SNAP.goalState], 'maxIterations') ?? 0,
+              status: str(snapshots[SNAP.goalState], 'status'),
             })}
           </p>
         </section>
       )}
 
-      {snapshots.domain_usage && (
+      {snapshots[SNAP.domainUsage] && (
         <section className="ucx__block">
           <h5 className="ucx__sub">{t('ctx.domainUsage')}</h5>
-          <p className="ucx__line"><code>{str(snapshots.domain_usage, 'key')}</code></p>
+          <p className="ucx__line"><code>{str(snapshots[SNAP.domainUsage], 'key')}</code></p>
         </section>
       )}
 
-      {snapshots.landing && (
+      {snapshots[SNAP.landing] && (
         <section className="ucx__block">
           <h5 className="ucx__sub">{t('ctx.landing')}</h5>
           <p className="ucx__line">
-            <code>{t('ctx.landingSha', { action: str(snapshots.landing, 'action'), sha: str(snapshots.landing, 'sha').slice(0, 8) })}</code>
+            <code>{t('ctx.landingSha', { action: str(snapshots[SNAP.landing], 'action'), sha: str(snapshots[SNAP.landing], 'sha').slice(0, 8) })}</code>
           </p>
         </section>
       )}
 
-      {snapshots.hook_result && (
+      {snapshots[SNAP.hookResult] && (
         <section className="ucx__block">
           <h5 className="ucx__sub">{t('ctx.hook')}</h5>
           <p className="ucx__line">
             {t('ctx.hookLine', {
-              event: str(snapshots.hook_result, 'event'),
-              turn: num(snapshots.hook_result, 'turn') ?? 0,
-              n: Array.isArray(snapshots.hook_result.results) ? (snapshots.hook_result.results as unknown[]).length : 0,
+              event: str(snapshots[SNAP.hookResult], 'event'),
+              turn: num(snapshots[SNAP.hookResult], 'turn') ?? 0,
+              n: Array.isArray((snapshots[SNAP.hookResult] ?? {}).results) ? ((snapshots[SNAP.hookResult] ?? {}).results as unknown[]).length : 0,
             })}
           </p>
         </section>

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useT, type LocaleKey } from '@tianshu/locale'
 import {
+  createLatestGate,
   effectiveStatus,
   type CronTriggerType,
   type ScheduleStatus,
@@ -54,16 +55,26 @@ export function AutomationBoard({ api, canPatch, defaultCwd }: AutomationBoardPr
     prompt: '', type: 'cron', spec: '0 4 29 2 *',
   })
 
+  // 定时表的两个槽各一把令牌：一轮扫描超过 30s 时，两轮会重叠，而重叠的反序落地会把"板子显示的
+  // 是哪一刻"变成随机的。桩不住的那半（jobs 列表）单独一把，因为它与 definitions 是两次独立读。
+  const boardGate = useMemo(() => createLatestGate(), [])
+  const jobsGate = useMemo(() => createLatestGate(), [])
+
   const reload = useCallback(() => {
+    const token = boardGate.begin()
+    const jobToken = jobsGate.begin()
     void Promise.all([api.listScheduledTasks(), api.scheduleStatus()])
-      .then(([tsk, h]) => { setTasks(tsk); setHealth(h); setError(null) })
-      .catch((e: Error) => setError({ key: 'schedule.loadFailed', message: e.message }))
+      .then(([tsk, h]) => {
+        if (!boardGate.isCurrent(token)) return
+        setTasks(tsk); setHealth(h); setError(null)
+      })
+      .catch((e: Error) => { if (!boardGate.isCurrent(token)) return; setError({ key: 'schedule.loadFailed', message: e.message }) })
     // Definitions and runs are different surfaces: a failure here degrades the run list to
     // a labelled empty state rather than blanking the schedule board with it.
     api.listTasks()
-      .then((page) => { setJobs(page.tasks); setJobsUnavailable(false) })
-      .catch(() => { setJobs([]); setJobsUnavailable(true) })
-  }, [api])
+      .then((page) => { if (!jobsGate.isCurrent(jobToken)) return; setJobs(page.tasks); setJobsUnavailable(false) })
+      .catch(() => { if (!jobsGate.isCurrent(jobToken)) return; setJobs([]); setJobsUnavailable(true) })
+  }, [api, boardGate, jobsGate])
 
   // The server says the 30s poll also surfaces write health, so a save that never
   // reached the disk is visible here rather than only at save time.

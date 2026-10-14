@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf8" />
+  <title>天枢 · 代码着色探针</title>
+</head>
+<body>
+  <!-- Developer page, not product surface: it mounts the real <MarkdownBlock> with a sealed fenced
+       code block, so a headless browser can prove shiki actually painted tokens **in the browser**.
+       That matters because MarkdownBlock swallows highlight failures with `.catch(() => setHtml(plain))`
+       — a broken grammar load in the built bundle looks exactly like correct plain code.
+       Built as a sixth vite input; nothing links to it. Measured by `node scripts/check-live-geometry.mjs`
+       (the 着色 rows). -->
+  <div id="root"></div>
+  <script type="module" src="/src/hl-probe.tsx"></script>
+</body>
+</html>

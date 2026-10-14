@@ -20,3 +20,4 @@ apps/desktop/release/
 
 # Runtime skills the kernel plants into the session cwd — not source.
 .rivet/
+.live-geometry/

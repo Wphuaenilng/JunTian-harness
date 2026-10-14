@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "CSS token layer and theme boot script. Design values lifted verbatim from the approved mockup so UI and design cannot drift.",
+  "description": "CSS token layer and theme boot script. Token values are reconciled against the approved mockup by scripts/check-mockup-tokens.mjs (values equal; naming and formatting normalized), so UI and design cannot drift silently.",
   "exports": {
     "./tokens.css": "./src/tokens.css",
     ".": "./src/index.ts"

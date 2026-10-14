@@ -1,0 +1,22 @@
+{
+  // 类型面的"全量档"：与 apps/web/tsconfig.json 同档（同 strict / paths / jsx / baseUrl，靠 extends 拿），
+  // 但把 46 个从不被检查的文件也拉进来——31 份测试、13 份 scripts/accept-*|probe-*、vite.config.ts。
+  // 存在的理由（2026-10-12 实测）：`node --test` 跑 `.ts` 靠类型擦除，所以测试里"从一个不导出它的
+  // 模块导入类型"这种错永远不会响；一次临时全量检查就抓到两处那样的幽灵导入。
+  // 放在 apps/web/ 下而不是 client/ 根，是因为台账的提交清单是目录级 pathspec（apps/ packages/ scripts/
+  // + 三个根文件），根下新文件会被静默漏出提交——那条覆盖判定（check:nongoals）真会红。
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["vite/client", "node"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "vite.config.ts",
+    "../../packages/*/src/**/*.ts",
+    "../../packages/*/src/**/*.tsx",
+    "../../packages/*/test/**/*.ts",
+    "../../scripts/**/*.ts"
+  ]
+}

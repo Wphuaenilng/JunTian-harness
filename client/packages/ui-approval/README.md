@@ -34,11 +34,20 @@ by `describeWait` in `wait.ts` (so they are testable rather than observably-by-p
 - **>= 30 s (`stallAfterMs`, inclusive)** — the card turns loud: red border and 「这个会话正卡在这里，
   模型不会自己继续」. Worth saying out loud: **nothing had ever rendered this branch**, because
   seeing it meant reaching a real gate and deliberately not answering it, i.e. paying for a run
-  and leaving it hanging. It is now pinned by `test/wait.test.ts` at 7 999 / 8 000 / 8 001 /
-  29 999 / 30 000 ms, including "the alarm replaces the hint, never both" and "the threshold is
-  a parameter". `syncArrivals` is tested alongside it because an id that is answered and later
-  reappears must start a fresh clock — otherwise the panel would paint a brand-new gate as
-  already stalled.
+  and leaving it hanging. That is no longer true as of 2026-10-12: `apps/web/stall-probe.html`
+  (a developer page, seventh vite input, nothing links to it) mounts this same panel twice over one
+  fixture where the only difference is the `stallAfterMs` prop — 1 ms vs one hour — and
+  `node scripts/check-live-geometry.mjs` reads back four anchors: the loud column really shows the
+  alarm (element visible, text non-empty, `ua__card--stalled` present), the quiet twin next to it
+  shows none, the text carries a number (so it comes from the dictionary), and the card's *computed*
+  border/background differ from the quiet one (a class flip with no style change would still be
+  invisible to a user). What that does **not** prove: that a real gate ever sat unanswered for 30
+  seconds — that half still costs a live run, and `check:traps` §5.2-5 delegates to these anchors by
+  name so deleting or renaming one turns that line red. It is also pinned by `test/wait.test.ts` at
+  7 999 / 8 000 / 8 001 / 29 999 / 30 000 ms, including "the alarm replaces the hint, never both"
+  and "the threshold is a parameter". `syncArrivals` is tested alongside it because an id that is
+  answered and later reappears must start a fresh clock — otherwise the panel would paint a
+  brand-new gate as already stalled.
 
 Silent waiting is not an option here.
 

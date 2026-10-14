@@ -56,14 +56,18 @@ export function setDraft(store: ViewStore, sessionId: string, text: string): voi
 }
 
 /**
- * Three notification cadences (plan §4.3 #3): immediate for anything that must feel
- * instant, microtask for cheap derived updates, and this one — coalesce everything
- * above it into a single repaint per frame.
+ * 计划 §4.3 #3 要「通知三档节拍（立即／微任务／rAF）」。这里只拥有其中**两档**，第三档不归本模块：
  *
- * rAF is the coalescer but cannot be the only trigger: a hidden/background tab never
- * fires it (verified in this project's own in-app browser, where a status counter
- * batched on rAF alone stayed at zero forever). The timeout races it so an update is
- * never lost — it just arrives up to `starveMs` late when nobody is looking.
+ * 1. **立即** = `store.setState` 本身——zustand 同步通知订阅者，所以点一下就要有反应的东西
+ *    （主题、面板开合、输入框草稿）直接走这条路，测试 `store.test.ts` 钉的是"订阅者在下一句话之前
+ *    就已经被叫过"。
+ * 2. **rAF** = 下面这个 `createFrameScheduler`——把一帧内的几十条 delta 合成一次重绘。
+ * 3. **微任务** = **React 18 自己的自动批处理**，不是我们另写的一档。全仓 `queueMicrotask` 零命中
+ *    是有意的：在 `createRoot` 下再手写一层微任务队列，只会和渲染器的批处理抢时序。
+ *
+ * rAF 不能是唯一触发器：隐藏／后台标签永远不发 rAF（在本机内置浏览器里实测过——一个只靠 rAF 合帧的
+ * 状态计数器会一直停在 0）。所以每次都跟一个 `starveMs` 超时赛跑，更新不会丢，只是没人看着的时候
+ * 最多晚到 `starveMs`。
  */
 export function createFrameScheduler(fn: () => void, starveMs = 120): () => void {
   let queued = false

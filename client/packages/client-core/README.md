@@ -15,10 +15,11 @@ sees five event categories; below it there are 56 wire event types.
 | `POST /sessions/:id/prompt` | `prompt()` | run; **409 → caller queues** |
 | `POST /sessions/:id/queue` `/queue/retract` | `queue()/retractQueued()` | busy-lane follow-up, input never lost |
 | `POST /sessions/:id/abort` | `abort()` | stop a run |
-| `GET /sessions/:id/stream?since=N` | `session-stream.ts` | event timeline (fetch, not EventSource: Bearer) |
-| `GET /sessions/:id/events[?before=]` | `events()/historyPage()` | REST snapshot + cold-channel paging |
+| `GET /sessions/:id/stream?since=N` | `session-stream.ts` | event timeline (fetch, not EventSource: Bearer); framing is `sse-frames.ts` |
+| `GET /sessions/:id/events?since=` | `events()` | REST 尾段快照（`EventWindow`）：内核这一路只回 `{events,lastSeq}`，**没有磁盘头字段**，所以"还有没有更早的"在这儿问不出来 |
+| `GET /sessions/:id/events?before=` | `historyPage()` | 冷通道向上分页（`ColdEventPage`）：多回一个 `firstSeq`＝磁盘日志最早 seq，`events[0].seq === firstSeq` 是唯一的"翻到头"可观察信号；页首还会向前对齐到最近的 user 事件，所以一页可能比 `limit` 长 |
 | `GET/POST /sessions/:id/interventions[/:rid/answer]` | `interventions()/answerApproval()` | approval ground truth +回执 |
-| `GET /events` | `server-events.ts` | liveness + list invalidation (**health heartbeat, not a session timeline**) |
+| `GET /events` | `server-events.ts` | liveness + list invalidation (**health heartbeat, not a session timeline**); framing is `sse-frames.ts`, but the event guard stays local — these frames have **no `seq`**, so `readSse`'s guard would drop every one of them |
 | `GET /sessions/:id/git/diff` `…/git/file-base` `…/git/working-tree` | `sessionFileDiff()/sessionFileBase()/sessionWorkingTree()` | the tool card's landed diff + before-view; baseline-scoped, and a path escaping the cwd answers **500** |
 | `GET/POST /git/workbench/*`, `/config/*`, `/schedule*`, `/tasks`, `/sessions/:id/cockpit`, `/rewind-points`, `/rewind`, `/files`, `/file-content`, `/dir`, `/artifacts` | `sidecar-client.ts` (each method cites its route) | panels; see each `ui-*` README for which package consumes which |
 
@@ -54,6 +55,10 @@ union, so a new contract event **fails typecheck until it is categorized on purp
 - `seq === 0` is synthetic meta (`replay_window`, `job_snapshot`, `delegation_snapshot`,
   `approval_snapshot`): passes through, **never advances the reconnect cursor**.
 - One SSE connection = one generation; a reconnect seals the previous partial.
+- Reconnect pacing counts **consecutive failures since the last delivered frame** — any inbound
+  frame resets the ladder, so a long healthy period is never punished with a saturated first
+  retry. Ceiling = `min(500ms · 2^attempt, 10s)`, waited as a full-jitter draw over `[0, ceiling]`
+  (`reconnectCeiling`; `rand`/`sleepMs` exist so the ladder is assertable without wall clocks).
 - `readSse` ignores unparseable frames instead of killing the stream.
 - Never bypass the sidecar: no `~/.rivet` reads, no direct SQLite (plan §2.2).
 

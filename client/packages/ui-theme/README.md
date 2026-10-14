@@ -4,8 +4,10 @@ Design tokens and theme boot. No components, no runtime deps.
 
 ## Consumed by every ui-* package
 
-- `tokens.css` — the `:root` ramp transcribed from the approved mockup
-  (`analysis-reports/定稿-天枢客户端方案/design/desktop-mockup-dsh-style.html`).
+- `tokens.css` — the `:root` ramp; each value is reconciled against the approved mockup by
+  `node scripts/check-mockup-tokens.mjs`（结论：真值差 0 条；6 条改名后相等、4 条仅写法差、
+  7 条是我们自定而 mockup 从未声明的 —— 所以「与定稿一致」只对**值**成立，不对命名与几何成立）
+  事实源：`analysis-reports/定稿-天枢客户端方案/design/desktop-mockup-dsh-style.html`。
   Components must reference the **semantic aliases** (`--bg-base`, `--label-primary`,
   `--accent`, …), never a raw ramp value like `--nb-700`. That is what keeps a dark
   theme a one-file change instead of a sweep through every stylesheet.
@@ -35,7 +37,7 @@ forced 值赢过系统偏好，system 值跟随偏好，两者都不脏。
 
 行为判定：`test/theme.test.ts` 4 条（`FakeBrowser` 伪造 dataset / localStorage / matchMedia，
 真发 `change` 事件，验重盖章、回调值、退订后不再回调、存储被封时不抛）。
-`check-theme.mjs` 静态 14 + 委托 2 + 人工留档 1，已接入 `ci-smoke` 第一阶段。
+`check-theme.mjs` 静态 14 + 委托 3 + 人工留档 0，已接入 `ci-smoke` 第一阶段。第三条委托是**帧内主题重推的浏览器实测**：由 `scripts/check-live-geometry.mjs` 开 `/frame-probe.html` 读回 `window.__probe__` 的 13 条判定与 `pass`（该门故意不接 CI、且要本机 Edge，所以口径是"门能测、CI 不跑"，不是"测不了"）。人工留档现在只剩真测不了的那一眼：在 Windows 里翻系统深色。
 8 条反向变异全部见红（漏依赖、现读值、不订阅、同值陷阱、双真相、probe 不翻转、不退订、不盖章）。
 
 **仍未实测**：真人在 Windows 设置→颜色→深色 里翻转系统主题。内置浏览器无法 emulate 媒体

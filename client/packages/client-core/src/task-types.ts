@@ -48,9 +48,12 @@ export interface TaskRecord {
 }
 
 /**
- * `task-routes.ts:25-40`. These travel as a **query string**: `fetch` will not send a body
- * with GET, and the router hands query params to the handler (`src/server/index.ts:80-86`),
- * which is what `task-routes.ts:197-200` reads.
+ * `task-routes.ts:25-40`. These travel as a **query string** (`fetch` will not send a body with
+ * GET), and the router does hand query params to the handler — in its **second** parameter
+ * (`src/server/index.ts:83-92`), which `GET /tasks` calls `_params` and ignores while reading
+ * the filter from `body` instead (`src/server/task-routes.ts:194-200`). Over HTTP that means the
+ * server filters nothing and returns every record; `listTasks()` therefore applies this same
+ * filter locally (`task-view.ts`), so a caller gets the page it asked for either way.
  */
 export interface TaskFilterRequest {
   status?: readonly TaskStatus[]

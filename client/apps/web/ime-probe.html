@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>天枢 · IME 提交探针</title>
+</head>
+<body>
+  <!-- 开发者页面，不是产品面：它挂一个与 composer 同形状的 controlled textarea，Enter 的判定走
+       `submitsOnEnter`（与 apps/web/src/App.tsx 那一处同一个谓词）。像素门 `/ime-probe.html` 用一次
+       真按键（Playwright 的 Enter，isComposing 必为 false）与一次合成按键（`new KeyboardEvent` 带
+       isComposing: true，正是输入法上屏那一下浏览器给的事件形状）各打一发，读回页面自己记录的
+       "这一次有没有发送"。它证明的是标志可达 + 判定生效；真操作系统的输入法序列与真产品页上那个
+       composer（要一台有会话的实例）不在这一格里。第八个 vite 输入，没有任何链接指向它。 -->
+  <div id="root"></div>
+  <script type="module" src="/src/ime-probe.tsx"></script>
+</body>
+</html>

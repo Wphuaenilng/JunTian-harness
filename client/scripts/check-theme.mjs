@@ -74,8 +74,19 @@ const record = (group, kind, label, ok, note = '') => results.push({ group, kind
   const probe = read('apps/web/src/frame-probe.tsx')
   record('帧同步', 'static', 'frame-probe 会主动翻转宿主主题，并把收到的序列报出来',
     /setTheme\(\(t\) => \(t === 'dark' \? 'light' : 'dark'\)\)/.test(probe) && /themeRePushedOnHostChange/.test(probe))
-  record('帧同步', 'manual', '浏览器里的实测值（themes 应为 ["dark","light"]）由 frame-probe 页面给出，CI 里跑不动',
-    true, 'open http://127.0.0.1:5300/frame-probe.html → window.__probe__.themes')
+  // 「它接不接 CI、为什么红」也必须派生：从 verify-all 的步骤表里取那一行的 parked 与 label，
+  // 这里不再手写红因（曾手写过「还有两条几何未决」，几何按裁定 ④ 办掉之后那条陈述就过期了）。
+  const pixelStep = (() => {
+    const v = read('scripts/verify-all.mjs')
+    const line = v.split('\n').find((l) => l.includes('check-live-geometry.mjs') && l.includes('key:'))
+    if (!line) return null
+    return { parked: /parked:\s*true/.test(line), label: (/label:\s*'([^']*)'/.exec(line)?.[1] ?? '').replace(/\*\*/g, '') }
+  })()
+  record('帧同步', 'delegated', '浏览器里的实测值（themes 应为 ["dark","light"]）由看像素的那道门代读，不再靠人开页面',
+    has('scripts/check-live-geometry.mjs') && pixelStep !== null,
+    pixelStep === null
+      ? 'verify-all 的步骤表里找不到像素门那一步——「由它代读」这句话没有出处'
+      : `scripts/check-live-geometry.mjs：它开 /frame-probe.html 读 window.__probe__.checks 的全部 13 条 + 汇总 pass；聚合入口现读它是「${pixelStep.parked ? '故意红（parked，不决定退出码）' : '已转绿、计入退出码'}」，红因照它自己的 label 说：${pixelStep.label || '（该步没有 label）'}；它还要求本机有 Edge，所以 CI 不跑它——这一条是「门能测、CI 不跑」，不是「测不了」`)
 }
 
 // ---------------------------------------------------------------- 行为判定交给单测
@@ -83,8 +94,21 @@ const record = (group, kind, label, ok, note = '') => results.push({ group, kind
   const t = has('packages/ui-theme/test/theme.test.ts') ? read('packages/ui-theme/test/theme.test.ts') : ''
   record('行为', 'delegated', 'watchSystemTheme 的换 stamp / 回调值 / 退订后不再回调由单测判定',
     t.length > 0 && /removeEventListener|stop\(\)/.test(t) && /watchSystemTheme/.test(t), 'packages/ui-theme/test/theme.test.ts')
-  record('行为', 'delegated', '浅色 token 的可读性另有一条门禁（当前未接入 CI）',
-    has('scripts/check-contrast.mjs'), 'check-contrast.mjs：浅色 9 组文本对不达 AA，属未决项 #29')
+  // 「另有一条门禁」这句话含两个可验的宣称：那条门存在，且它真在 CI 的名单里。
+  // 接线状态必须**从制品派生**，不许手写：本仓曾在诊断里手抄过「未接入 CI、浅色 9 组不达 AA」，
+  // 那两条 2026-10-12 夜之后就都是假的——手写理由一过期，门就对自己的现状说谎。
+  const gatesList = (() => {
+    const p = join(resolve(clientRoot, '..'), '.github/workflows/client-gates.yml')
+    if (!existsSync(p)) return null
+    const line = /^#[ \t]+gates:[ \t]*(.+)$/m.exec(readFileSync(p, 'utf8'))?.[1]
+    return line ? line.split(',').map((s) => s.trim()).filter(Boolean) : null
+  })()
+  const contrastWired = gatesList !== null && gatesList.includes('check-contrast.mjs')
+  record('行为', 'delegated', '浅色 / 暗色 token 的可读性另有一条门禁，且它已在 CI 的门名单里（AA 是硬门，红就是挡）',
+    has('scripts/check-contrast.mjs') && contrastWired,
+    contrastWired
+      ? 'check-contrast.mjs：派生自 .github/workflows/client-gates.yml 的 `# gates:` 行（名单逐名逐序对齐归 check:docs 管，这里不重复持数）'
+      : `check-contrast.mjs 不在 CI 的 gates 名单里（名单现读：${gatesList === null ? '读不到制品' : gatesList.join(' ')}）——「另有一条门禁」就只是本地习惯`)
 }
 
 // ---------------------------------------------------------------- report

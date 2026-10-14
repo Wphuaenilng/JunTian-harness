@@ -47,8 +47,14 @@ test('a user event closes the open assistant tail so ordering survives', () => {
     ev(3, 'text_delta', { text: 'third' }),
   ])
   assert.deepEqual(s.current.blocks.map((b) => b.kind), ['text', 'user', 'text'])
-  assert.equal(s.current.blocks[0]?.kind === 'text' && s.current.blocks[0].open, false)
-  assert.equal(s.current.blocks.at(-1)?.kind === 'text' && s.current.blocks.at(-1)?.kind === 'text' && s.current.blocks.at(-1).open, true)
+  const head = s.current.blocks[0]
+  const tail = s.current.blocks.at(-1)
+  // 先各断一条 kind，再进收窄分支断 open：以前写成 `assert.equal(kind === 'text' && block.open, false)`，
+  // kind 一旦不是 text 表达式也是 false，断言会因为错的理由通过。
+  assert.equal(head?.kind, 'text', 'head block is the sealed text block')
+  assert.equal(tail?.kind, 'text', 'tail block is the live text block')
+  if (head?.kind === 'text') assert.equal(head.open, false, 'the sealed first block stays closed')
+  if (tail?.kind === 'text') assert.equal(tail.open, true, 'the live tail block stays open')
 })
 
 test('tool_use and tool_result pair into one block by call id', () => {

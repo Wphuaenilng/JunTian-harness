@@ -16,7 +16,9 @@
  *   - endpoints  : `api.<method>(` / `client.<method>(` call sites, mapped through the
  *                  HTTP verb + path template declared in sidecar-client.ts;
  *   - event types: string literals that are members of the mirrored `SessionEventType`
- *                  union (so the ledger drifts with the protocol mirror, not with memory);
+ *                  union, plus the `SNAP.<key>` aliases that stand in for them (the layering
+ *                  rule forbids the literal in a panel) — so the ledger drifts with the
+ *                  protocol mirror, not with memory;
  *   - block kinds: `kind === 'x'` / `case 'x'` against the `Block` union — the folded
  *                  surface most views actually switch on, which is not the same as the
  *                  wire list and is recorded separately rather than merged into it.
@@ -114,6 +116,20 @@ if (EVENT_TYPES.length === 0 || BLOCK_KINDS.length === 0) {
   console.error('protocol-ledger: could not read the unions — refusing to write an empty ledger')
   process.exit(1)
 }
+/**
+ * `check:layers` requires UI packages to spell snapshot keys through `SNAP.*` — the wire name must
+ * not appear as a literal in a panel. A scan that reads only literals therefore goes blind exactly
+ * where that discipline is enforced, and the ledger it writes says "this panel consumes 4 event
+ * types" about a panel that renders twelve. Resolve the alias table from its one home and follow it.
+ */
+const SNAP_ALIAS = new Map(
+  [...codeOf(join(core, 'snapshot-keys.ts')).matchAll(/^ {2}([a-zA-Z][A-Za-z]*): '([a-z0-9_]+)'/gm)]
+    .map((m) => [m[1], m[2]]),
+)
+if (SNAP_ALIAS.size === 0) {
+  console.error('protocol-ledger: SNAP alias table unreadable — refusing to write a ledger blind to it')
+  process.exit(1)
+}
 
 // ---------------------------------------------------------------- scan
 function srcFiles(dir) {
@@ -141,6 +157,10 @@ function collect(dir) {
     }
     for (const c of src.matchAll(/['"]([a-z0-9_]+)['"]/g)) {
       if (EVENT_TYPES.includes(c[1])) events.add(c[1])
+    }
+    for (const c of src.matchAll(/\bSNAP\.([a-zA-Z][A-Za-z]*)\b/g)) {
+      const lit = SNAP_ALIAS.get(c[1])
+      if (lit !== undefined && EVENT_TYPES.includes(lit)) events.add(lit)
     }
     for (const c of src.matchAll(/kind\s*[=!]==?\s*['"]([a-z_]+)['"]|case\s+['"]([a-z_]+)['"]/g)) {
       const k = c[1] ?? c[2]

@@ -1,7 +1,7 @@
 .fl { display: flex; flex-direction: column; gap: 8px; }
 .fl__search { font: inherit; font-size: 12px; padding: 6px 9px; border: 1px solid var(--border-l2); border-radius: 7px; background: var(--bg-base); color: var(--label-primary); }
 .fl__search:focus { outline: none; border-color: var(--ds-400); }
-.fl__error { padding: 7px 9px; border: 1px solid var(--danger); border-radius: 8px; background: #FDECEC; font-size: 12px; color: var(--danger); }
+.fl__error { padding: 7px 9px; border: 1px solid var(--danger); border-radius: 8px; background: var(--danger-soft); font-size: 12px; color: var(--label-primary); }
 .fl__empty { font-size: 12px; color: var(--label-caption); }
 .fl__crumb { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--label-tertiary); }
 .fl__crumb code { font-family: var(--font-code); color: var(--label-caption); word-break: break-all; }

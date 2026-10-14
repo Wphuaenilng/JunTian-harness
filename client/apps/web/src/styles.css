@@ -11,41 +11,61 @@ body {
   grid-template-columns: var(--sidebar-width) 1fr auto;
   grid-template-rows: 1fr var(--statusbar-height);
 }
-.app > aside:not(.app__rail) { grid-row: 1 / 3; min-height: 0; }
-.app > main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+/*
+ * Columns are pinned explicitly. Auto-placement looked right and was wrong: the rail
+ * (`grid-row: 1 / 3`) got pushed into the `1fr` middle track and `main` — the conversation —
+ * was squeezed into the trailing `auto` track. Measured at 1443px: tracks `264 889 290`,
+ * `main` at left 1153 (width 290), rail at left 264 (width 320). Nothing overflowed, so
+ * "0 元素溢出" stayed green while the layout was scrambled.
+ */
+.app > aside:not(.app__rail) { grid-column: 1; grid-row: 1 / 3; min-height: 0; }
+.app > main { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 
-/* Collapsed right rail is 44px, per design/tianshu-desktop-mockup-dsh-collapsed.png. */
+/* 收起态照第二张定稿图（源稿 `.d-rail` / `.rail-btn` / `.rail-expand` / `.mini`）：44px 细条里竖排
+   一枚 « 展开钮 + 每组一枚 36×36 图标钮（r8、条内 gap 4、padding 10 0、角点 6px）。此前这里只有
+   一个竖排文字钮「面板」——那只有一个动作（整栏展开），而图上这一条给的是"按组跳入"这一层 IA。 */
 .app__rail {
+  grid-column: 3;
   grid-row: 1 / 3;
-  width: 44px;
+  width: var(--scale-rail-collapsed);
   min-height: 0;
   border-left: 1px solid var(--border-l1);
   background: var(--bg-sidebar);
   overflow: hidden;
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
 }
-.app__rail--open { width: 320px; justify-content: stretch; align-items: stretch; }
-.app__railbtn {
-  margin-top: 12px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--label-tertiary);
-  letter-spacing: 1px;
-  /* Vertical instead of a hardcoded `面<br>板`: CJK stacks character-by-character and
-     Latin rotates sideways, so the same label reads correctly in both languages. */
-  writing-mode: vertical-rl;
+.app__rail--open { width: var(--scale-rail-open); }
+.app__rail > * { flex: 1; min-width: 0; }
+.app__railstrip {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 0; min-height: 0; overflow: hidden;
 }
-.app__rail--open > * { flex: 1; min-width: 0; }
+.app__railexpand, .app__railbtn {
+  width: var(--scale-rail-btn); height: var(--scale-rail-btn); flex: none;
+  display: grid; place-items: center; position: relative;
+  border: none; border-radius: 8px; background: transparent; cursor: pointer;
+  font-size: 14px; line-height: 1;
+}
+.app__railexpand { color: var(--label-secondary); font-size: 13px; margin-bottom: 4px; }
+.app__railbtn { color: var(--label-tertiary); }
+.app__railexpand:hover, .app__railbtn:hover { background: var(--bg-hover); color: var(--label-primary); }
+/* 角点只在本机真握得住那一组读数时才画。图上四枚点各带一个百分比/计数，其中三枚的源（工具计数、
+   事件管线、检查点数）不进面板就不会到客户端——凭空点一颗色点是假信号，不是省略。 */
+.app__railmini {
+  position: absolute; right: 4px; bottom: 4px;
+  width: var(--scale-rail-mini); height: var(--scale-rail-mini);
+  border-radius: 50%; background: var(--nb-400);
+}
 .app__panel { display: flex; flex-direction: column; min-height: 0; width: 100%; }
 .app__panel-head {
   display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px 0;
   border-bottom: 1px solid var(--border-l1); background: var(--bg-sidebar);
 }
+/* The rail's own close button: it used to wear `.set__close`, a class ui-settings defines for its
+   own panel. Same smell as the git workbench's ✕ (fixed earlier) — a name that lives in another
+   package's stylesheet is an implicit contract that silently changes when that package restyles
+   itself, and nothing in the browser-side census ties a *host* element to a package's class. */
+.app__railclose { border: none; background: none; color: var(--label-caption); cursor: pointer; font-size: 13px; }
 /* wrap, not scroll: "Automations" is wider than the 320px rail's share, and a tab the
    reader cannot see is worse than a second row. Chinese stays on one row. */
 .app__tabs { display: flex; flex-wrap: wrap; gap: 2px; flex: 1; min-width: 0; }
@@ -62,20 +82,20 @@ body {
   margin: 10px 16px 0; padding: 8px 11px; border-radius: 8px; font-size: 12.5px;
   background: var(--bg-selector); border: 1px solid var(--border-l2); color: var(--label-secondary);
 }
-.app__banner--danger { background: #FDECEC; border-color: var(--danger); color: var(--danger); }
+.app__banner--danger { background: var(--danger-soft); border-color: var(--danger); color: var(--label-primary); }
 .app__banner button { border: none; background: none; cursor: pointer; color: inherit; }
 
 .app__composer { border-top: 1px solid var(--border-l1); padding: 10px 0 12px; background: var(--bg-base); }
-.app__composer-col { max-width: var(--measure); margin: 0 auto; }
+.app__composer-col { max-width: var(--scale-dock-width); margin: 0 auto; }
 .app__input-row { display: flex; gap: 8px; align-items: flex-end; }
 .app__input-row textarea {
-  flex: 1; font: inherit; resize: none; border: 1px solid var(--border-l2); border-radius: 10px;
-  padding: 9px 11px; max-height: 140px; background: var(--bg-base); color: var(--label-primary);
+  flex: 1; font: inherit; resize: none; border: 1px solid var(--border-l2); border-radius: var(--scale-composer-radius);
+  padding: 10px 16px; max-height: 140px; background: var(--bg-base); color: var(--label-primary);
 }
 .app__input-row textarea:focus { outline: none; border-color: var(--ds-400); }
 .app__send {
-  font: inherit; font-size: 13px; padding: 8px 14px; border: none; border-radius: 9px;
-  background: var(--nb-1000); color: #fff; cursor: pointer;
+  display: grid; place-items: center; width: var(--scale-send-size); height: var(--scale-send-size); flex: none;
+  border: none; border-radius: 999px; background: var(--nb-1000); color: var(--on-accent); cursor: pointer; font-size: 14px;
 }
 .app__ghost {
   font: inherit; font-size: 13px; padding: 8px 12px; border: 1px solid transparent;
@@ -85,7 +105,7 @@ body {
 .app__empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--label-caption); font-size: 13px; }
 
 .app__status {
-  grid-column: 1 / 4; border-top: 1px solid var(--border-l1); background: var(--bg-sidebar);
+  grid-column: 1 / 4; height: var(--scale-statusbar); border-top: 1px solid var(--border-l1); background: var(--bg-sidebar);
   display: flex; align-items: center; gap: 14px; padding: 0 14px;
   font-size: 11.5px; color: var(--label-tertiary);
 }
@@ -103,3 +123,15 @@ body {
 .app__dot--live { background: var(--ok); }
 .app__dot--replay, .app__dot--connecting { background: var(--ds-400); }
 .app__dot--down { background: var(--danger); }
+
+/* 续读缺口的两种口径分开着色：磁盘里还有的只是"可以更早"，真没了两处的才是需要看见的损失。 */
+.app__gap { font-size: 11px; color: var(--label-caption); }
+.app__gap--lost { color: var(--warn); }
+
+/* 右栏折叠组的栈，照图上 .details / .d-expanded / .d-topbar：栏本身左边一条 border-l2、
+   bg-base、overflow hidden；组体之间 6px 缝、外边距 10px 10px 12px；顶部条 12px caption 带 .5px 字距。
+   tab 那一套（.app__tabs/.app__tab）不再被渲染，样式留着也无引用——由 check:layout 钉住它不许回来。 */
+.app__secs { display: flex; flex-direction: column; gap: 6px; padding: 10px 10px 12px; }
+/* 每个组的根都必须允许收缩：定时任务面板的 .sc/.sc__new/.sc__trigger 实测 274 > 241 就是这样探出栏的。 */
+.app__secs > * { min-width: 0; }
+.app__secs-title { font-size: 12px; line-height: 20px; color: var(--label-caption); letter-spacing: .5px; }

@@ -26,7 +26,7 @@ services, and settings has a dozen independently-loading fields.
 - `apiKey` / `apiKeyEnv` are mutually exclusive server-side
   (`config-routes-keys.ts:137`); `SetKeyRequest` encodes that instead of letting the UI
   discover it via a 400.
-- Approval vocabulary is the contract's `ApprovalMode` (`protocol.ts:71`); a session may
+- Approval vocabulary is the contract's `ApprovalMode` (`src/server/protocol.ts:71`); a session may
   still override it via `SessionRecord.approvalMode`.
 
 ## Verified

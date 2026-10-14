@@ -55,7 +55,7 @@ if (!electronBin) {
 // Start from an empty daemon log so nothing from a previous boot can be mistaken for this one.
 if (existsSync(logPath)) execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], "")', logPath])
 
-const shell = spawn(electronBin, [desktopDir, '--smoke', '90'], {
+const shell = spawn(electronBin, [desktopDir, '--smoke', '90', '--isolate-home'], {
   cwd: clientRoot, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
 })
 let shellLog = ''

@@ -15,7 +15,12 @@ a global store would repaint every panel on each one (plan §4.3 #4).
 - `createFrameScheduler` — the rAF tier of the three notification cadences (§4.3 #3).
   It races rAF against a timeout on purpose: a hidden/background tab never fires rAF,
   and a counter batched on rAF alone can stall forever (observed in this project's own
-  in-app browser during M1 verification).
+  in-app browser during M1 verification). That rationale is no longer just a comment:
+  `test/frame-scheduler.test.ts` pins four behaviours — one repaint per frame no matter how
+  many requests arrive, the timeout still firing when frames never come, the fallback when
+  `requestAnimationFrame` does not exist at all, and re-arming after each flush (verified by
+  mutation: dropping the `queued` reset breaks only the re-arm test, dropping the timeout
+  breaks only the two stall tests).
 - `loadView` / `saveView` — the 「持久化」 cell of §4.2, as a **whitelist**:
   `openSessionId`, `includeArchived`, `rightTab`, `panels`. Out on purpose: `drafts` (a
   half-typed prompt may hold a credential or a local path — putting that in localStorage

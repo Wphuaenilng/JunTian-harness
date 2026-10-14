@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>天枢 · Git 工作台探针</title>
+</head>
+<body>
+  <!-- 开发者页面，不是产品面：它挂**真的** <GitPanel>，喂一个只实现这几个读方法的桩 client，
+       并把调用次数记在 window.__gitProbe__ 上。像素门 `/git-probe.html` 用两次采样判"挂载后
+       取数会不会自己转起来"（scope 曾是渲染期新建的对象字面量，会形成 render→fetch→setState→render
+       的循环），又用"先点慢回包的文件、再点快的那个"判迟到的 diff 会不会盖掉当前选中的内容。
+       量的都是组件的取数时序；真 git 语义由 accept-gitwrite.ts 在 bare 仓上量。第九个 vite 输入。 -->
+  <div id="root"></div>
+  <script type="module" src="/src/git-probe.tsx"></script>
+</body>
+</html>

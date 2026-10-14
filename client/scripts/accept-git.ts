@@ -15,8 +15,8 @@ import { SidecarClient } from '../packages/client-core/src/index.ts'
 import { diffStats, parseUnifiedDiff } from '../packages/ui-primitives/src/markdown.ts'
 
 const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const info = JSON.parse(readFileSync(join(clientRoot, '.sidecar-info.json'), 'utf8')) as { baseUrl: string; token: string }
-const api = new SidecarClient({ baseUrl: info.baseUrl, token: info.token })
+import { openInstance } from './lib-instance.ts'
+const { api, info } = openInstance('Git 工作台读路径（对真实仓库，只读）')
 
 const failures: string[] = []
 const check = (label: string, ok: boolean, detail = ''): void => {
@@ -42,8 +42,9 @@ check('snapshot carries a version for the write lock', /^[0-9a-f]{16,}$/.test(sn
 
 const conflictish = snap.changes.filter((c) => c.conflict)
 console.log(`  conflicts: ${conflictish.length}; sample: ${JSON.stringify(snap.changes[0] ?? null).slice(0, 140)}`)
+const firstChange = snap.changes[0]
 check('changes expose porcelain index/worktree chars',
-  snap.changes.length === 0 || (typeof snap.changes[0].index === 'string' && typeof snap.changes[0].worktree === 'string'))
+  firstChange === undefined || (typeof firstChange.index === 'string' && typeof firstChange.worktree === 'string'))
 
 const branches = await api.workbenchBranches(scope)
 console.log(`\nbranches: ${branches.branches.length} → ${branches.branches.slice(0, 4).map((b) => b.name).join(', ')}`)

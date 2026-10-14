@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  /* ============================================================
+     dsh 真实 token 值（浅色主题）
+     来源：packages/client/ui-theme/src/styles/design-platform.css
+     ============================================================ */
+  :root{
+    --nb-00:#FFFFFF; --nb-50:#FAFAFB; --nb-60:#F5F6F7; --nb-75:#F1F3F5;
+    --nb-100:#EBEEF2; --nb-150:#E9ECF2; --nb-200:#E1E5EE;
+    --nb-400:#ADB2B8; --nb-600:#81858C; --nb-700:#61666B; --nb-750:#43454A;
+    --nb-1000:#0F1115;
+    --ds-50:#EDF3FE; --ds-100:#E4EDFD; --ds-200:#D3E2FF; --ds-400:#679EFE;
+    --ds-500:#4176E6;
+    --blue-450:#4D93F8;
+    --green-500:#22C55E;
+    --red-600:#EC1313;
+    --amber-100:#FEF5E7; --amber-400:#F7AD31; --amber-500:#F59E0B; --amber-600:#DD8629;
+    --violet-400:#A78BFA;
+    --bg-base:var(--nb-00);
+    --border-l1:rgba(0,0,0,.04);
+    --border-l2:rgba(0,0,0,.10);
+    --hover:rgba(38,49,72,.06);
+    --label-primary:var(--nb-1000);
+    --label-secondary:var(--nb-700);
+    --label-tertiary:var(--nb-600);
+    --label-caption:var(--nb-400);
+    --sidebar-fill:var(--nb-50);
+    --bubble:var(--ds-50);
+    --selector:var(--nb-60);
+    --code-block:var(--nb-50);
+    --inline-code:var(--nb-100);
+    --shadow-lv2:0 4px 12px 0 rgba(0,0,0,.02),0 2px 8px 0 rgba(0,0,0,.04);
+    --font:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei','Helvetica Neue',Helvetica,Arial,sans-serif;
+    --font-code:'SF Mono','JetBrains Mono','Fira Code',Consolas,'Liberation Mono',Menlo,Courier,'PingFang SC','Microsoft YaHei';
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1600px;height:1000px;overflow:hidden}
+  body{
+    background:var(--bg-base);color:var(--label-primary);
+    font-family:var(--font);font-size:14px;line-height:22px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{display:flex;flex-direction:column;width:1600px;height:1000px}
+
+  /* ============ ① 标题栏（40px，可拖拽区观感；品牌已去重） ============ */
+  .titlebar{
+    flex:none;height:40px;display:flex;align-items:center;gap:4px;
+    padding:0 8px 0 20px;background:var(--bg-base);
+    border-bottom:1px solid var(--border-l1);user-select:none;
+    -webkit-app-region:drag;
+  }
+  .crumbs{display:flex;align-items:center;gap:4px;min-width:0}
+  .crumb{
+    max-width:220px;color:var(--label-tertiary);font-size:14px;line-height:20px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .crumb-sep{color:var(--label-caption);font-size:14px}
+  .crumb.cur{color:var(--label-primary);font-weight:500}
+  .tb-right{margin-left:auto;display:flex;align-items:center;gap:2px;-webkit-app-region:no-drag}
+  .tb-btn{
+    width:36px;height:32px;display:inline-flex;align-items:center;justify-content:center;
+    border:none;border-radius:6px;background:transparent;cursor:pointer;
+    color:var(--label-secondary);font-size:13px;font-family:var(--font);
+  }
+  .tb-btn:hover{background:var(--hover)}
+  .tb-sep{width:1px;height:16px;background:var(--border-l2);margin:0 6px}
+
+  /* ============ 三栏框架 ============ */
+  .frame{flex:1;display:grid;grid-template-columns:264px 1fr 288px;min-height:0}
+  body.details-collapsed .frame{grid-template-columns:264px 1fr 44px}
+
+  /* ---- 侧栏 ---- */
+  .sidebar{
+    background:var(--sidebar-fill);border-right:1px solid var(--border-l1);
+    display:flex;flex-direction:column;padding:6px 12px;min-height:0;
+  }
+  .logoRow{
+    flex:none;display:flex;align-items:center;gap:8px;height:60px;
+    padding:8px 0 8px 4px;margin-bottom:8px;
+  }
+  .logoRow .mark{
+    width:28px;height:28px;border-radius:8px;background:var(--ds-500);
+    color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;flex:none;
+  }
+  .logoRow .name{font-size:16px;font-weight:600;letter-spacing:1px}
+  .logoRow .sub{font-size:11px;color:var(--label-caption);margin-top:1px}
+  .domain{
+    flex:none;display:flex;align-items:center;gap:7px;margin:0 2px 10px;
+    padding:6px 10px;border-radius:8px;background:var(--selector);
+    font-size:13px;color:var(--label-secondary);
+  }
+  .domain .star{color:var(--ds-500);font-size:12px}
+  .domain b{font-weight:500;color:var(--label-primary)}
+  .domain .chev{margin-left:auto;color:var(--label-caption);font-size:10px}
+
+  .side-scroll{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+  .grp{
+    padding:8px 8px 4px;font-size:12px;line-height:17px;color:var(--label-caption);
+  }
+  /* ② 项目行 */
+  .prow{
+    display:flex;align-items:center;gap:8px;height:34px;border-radius:8px;
+    padding:0 8px;cursor:pointer;color:var(--label-primary);
+  }
+  .prow.selected{background:var(--hover)}
+  .picon{
+    flex:none;width:20px;height:20px;border-radius:6px;color:#fff;
+    font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;
+  }
+  .prow .t{
+    flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:14px;line-height:20px;
+  }
+  .prow .cnt{
+    flex:none;font-size:11px;line-height:16px;color:var(--label-tertiary);
+    background:var(--nb-100);border-radius:999px;padding:1px 7px;
+  }
+  .prow.selected .cnt{background:var(--nb-150)}
+  .newSession{
+    display:flex;align-items:center;gap:8px;height:32px;border-radius:8px;
+    padding:0 8px;margin-top:2px;cursor:pointer;
+    color:var(--label-tertiary);font-size:13px;
+  }
+  .newSession:hover{background:var(--hover)}
+  .newSession .plus{width:20px;text-align:center;font-size:13px}
+
+  /* ③ 最近对话行 */
+  .srow{
+    display:flex;align-items:center;height:32px;border-radius:8px;
+    padding:0 8px;cursor:pointer;color:var(--label-primary);
+  }
+  .srow.selected{background:var(--hover)}
+  .srow .slot{
+    flex:none;width:16px;height:20px;display:inline-flex;
+    align-items:center;justify-content:center;margin-right:4px;
+  }
+  .srow .sd{width:6px;height:6px;border-radius:50%}
+  .sd-run{background:var(--green-500);animation:breath 1.6s ease-in-out infinite}
+  @keyframes breath{0%,100%{opacity:1}50%{opacity:.35}}
+  .sd-wait{background:var(--amber-500)}
+  .sd-done{background:var(--nb-200)}
+  .srow .t{
+    min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:14px;line-height:20px;
+  }
+  .srow .meta{
+    flex:none;margin-left:auto;font-size:12px;color:var(--label-caption);padding-left:8px;
+  }
+  .side-foot{flex:none;padding-top:4px;border-top:1px solid var(--border-l1)}
+  .frow{
+    display:flex;align-items:center;gap:8px;height:32px;border-radius:8px;
+    padding:0 8px;font-size:14px;color:var(--label-secondary);
+  }
+  .frow .ico{width:16px;text-align:center;font-size:13px;color:var(--label-tertiary)}
+  .frow .cnt{
+    margin-left:auto;font-size:11px;color:var(--label-tertiary);
+    background:var(--nb-100);border-radius:999px;padding:1px 7px;
+  }
+
+  /* ---- 中栏 ---- */
+  .center{min-width:0;display:flex;flex-direction:column;background:var(--bg-base)}
+
+  .conv{
+    flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;
+    align-items:center;padding:16px 16px 0;
+  }
+  .conv-col{width:100%;max-width:748px;display:flex;flex-direction:column;gap:14px}
+
+  .userRow{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .userStack{max-width:min(525px,82%);display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+  .ububble{
+    background:var(--bubble);border-radius:22px;padding:10px 16px;
+    font-size:14px;line-height:22px;color:var(--label-primary);
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .u-meta{font-size:12px;line-height:17px;color:var(--label-caption)}
+
+  .flowrow{display:flex;flex-direction:column}
+  .fr-line{display:flex;align-items:center;height:24px;min-width:0}
+  .fr-lead{
+    flex:none;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;
+    margin-right:6px;color:var(--label-secondary);font-size:11px;
+  }
+  .fr-title{flex:none;font-size:13px;line-height:24px;color:var(--label-primary);font-weight:400}
+  .fr-sep{flex:none;width:2px;height:2px;margin:0 8px;border-radius:1px;background:var(--label-caption)}
+  .fr-sum{
+    flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:13px;line-height:24px;color:var(--label-tertiary);
+  }
+  .fr-sum code{font-family:var(--font-code);font-size:12px}
+  .fr-state{flex:none;margin-left:8px;font-size:12px;color:var(--label-caption)}
+
+  .termcard{
+    margin:4px 0 4px 4px;border:1px solid var(--border-l1);border-radius:12px;
+    background:var(--code-block);overflow:hidden;
+  }
+  .termcard .tc-banner{
+    display:flex;align-items:center;gap:8px;padding:8px 14px;
+    border-bottom:1px solid var(--border-l1);
+    font-family:var(--font-code);font-size:12px;line-height:18px;color:var(--label-tertiary);
+  }
+  .termcard .tc-banner .ok{margin-left:auto;color:var(--green-500);font-weight:500}
+  .termcard .tc-body{
+    padding:10px 14px;font-family:var(--font-code);font-size:12px;line-height:18px;
+    color:var(--label-secondary);white-space:pre-wrap;
+  }
+  .tc-body .p{color:var(--green-500)}
+  .tc-body .d{color:var(--label-caption)}
+  .tc-body .v{color:var(--label-primary)}
+
+  .md{font-size:14px;line-height:24px;color:var(--label-primary)}
+  .md code{
+    font-family:var(--font-code);font-size:13px;background:var(--inline-code);
+    border-radius:4px;padding:1px 5px;
+  }
+
+  .diffblock{margin:2px 0;background:var(--code-block);border-radius:12px;position:relative}
+  .diffblock .db-body{
+    padding:12px 14px;font-family:var(--font-code);font-size:13px;line-height:22px;overflow:hidden;
+  }
+  .db-line{white-space:pre;min-height:22px}
+  .db-path{color:var(--label-primary);font-weight:600}
+  .db-ctx{color:var(--label-secondary)}
+  .db-del{color:var(--red-600)}
+  .db-add{color:var(--green-500)}
+  .db-foot{
+    padding:0 14px 12px;font-family:var(--font-code);font-size:13px;line-height:22px;
+    color:var(--label-tertiary);
+  }
+
+  .stream{font-size:14px;line-height:24px;color:var(--label-primary)}
+  .caret{
+    display:inline-block;width:2px;height:16px;background:var(--ds-500);
+    vertical-align:-3px;margin-left:2px;animation:blink 1s steps(1) infinite;
+  }
+  @keyframes blink{50%{opacity:0}}
+
+  /* 底部停靠区：审批面板 + composer 同栏宽 */
+  .dock{
+    flex:none;display:flex;flex-direction:column;align-items:center;gap:10px;
+    padding:8px 32px 10px;
+  }
+  .dock-col{width:100%;max-width:780px;display:flex;flex-direction:column;gap:10px}
+
+  .approval{
+    overflow:hidden;width:100%;
+    border:1px solid var(--amber-400);border-radius:20px;
+    background:var(--nb-00);box-shadow:var(--shadow-lv2);
+  }
+  .ap-strip{
+    display:flex;align-items:center;gap:8px;padding:10px 16px;
+    background:var(--amber-100);color:var(--amber-500);
+    font-size:13px;line-height:18px;
+  }
+  .ap-strip .adot{width:8px;height:8px;border-radius:50%;background:var(--amber-500);flex:none}
+  .ap-strip .hang{margin-left:auto;font-size:12px;color:var(--amber-600);font-variant-numeric:tabular-nums}
+  .ap-body{display:flex;flex-direction:column;gap:6px;padding:12px 16px 0}
+  .ap-headline{font-size:15px;font-weight:500;line-height:24px;color:var(--label-primary)}
+  .ap-cmd{
+    font-family:var(--font-code);font-size:13px;line-height:20px;
+    color:var(--label-tertiary);word-break:break-all;
+  }
+  .ap-actions{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px 14px}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:4px;
+    height:36px;padding:0 14px;border:none;border-radius:18px;cursor:pointer;
+    font-size:14px;line-height:22px;font-family:var(--font);
+  }
+  .btn.primary{background:var(--nb-1000);color:#fff}
+  .btn.outline{background:transparent;border:1px solid var(--border-l2);color:var(--label-primary)}
+  .btn.ghost{background:transparent;color:var(--red-600)}
+
+  /* ④ composer（dsh InputBar：r22、l2 边、lv2 阴影、底部工具行） */
+  .composer{
+    box-sizing:border-box;position:relative;display:flex;flex-direction:column;gap:8px;
+    width:100%;padding-top:10px;
+    border:1px solid var(--border-l2);border-radius:22px;
+    background:var(--nb-00);box-shadow:var(--shadow-lv2);
+    font-size:14px;line-height:24px;
+  }
+  .cm-input{padding:4px 12px 0 16px;color:var(--label-caption);white-space:pre-wrap}
+  .cm-input .kbd{font-family:var(--font-code);font-size:12px}
+  .cm-row{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:2px 8px 8px;
+  }
+  .cm-tools{display:flex;align-items:center;gap:6px}
+  .cm-ico{
+    display:grid;place-items:center;width:28px;height:28px;flex:none;
+    border:none;border-radius:999px;background:var(--selector);
+    color:var(--label-primary);cursor:pointer;font-size:13px;
+  }
+  .cm-ico.ghost{background:transparent;color:var(--label-secondary)}
+  .cm-ico.ghost:hover{background:var(--hover)}
+  .cm-trailing{display:flex;align-items:center;gap:12px;flex:none}
+  .cm-model{
+    max-width:220px;height:28px;padding:0 20px 0 8px;border:none;border-radius:8px;
+    background-color:transparent;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 4px center;background-size:12px 12px;
+    color:var(--label-secondary);font-size:13px;line-height:20px;font-weight:500;
+    white-space:nowrap;cursor:pointer;font-family:var(--font);
+  }
+  .cm-model:hover{background-color:var(--hover)}
+  .cm-send{
+    display:grid;place-items:center;width:34px;height:34px;flex:none;
+    border:none;border-radius:999px;background:var(--ds-500);color:#fff;
+    cursor:pointer;font-size:14px;transform:translateY(-2px);
+  }
+
+  /* ---- ⑥ 右栏 details：折叠组范式 ---- */
+  .details{
+    border-left:1px solid var(--border-l2);background:var(--bg-base);
+    overflow:hidden;display:flex;flex-direction:column;min-height:0;
+  }
+  body.details-collapsed .details .d-expanded{display:none}
+  .details .d-rail{display:none}
+  body.details-collapsed .details .d-rail{display:flex}
+  .d-expanded{display:flex;flex-direction:column;gap:6px;padding:10px 10px 12px;overflow:hidden}
+  .d-topbar{
+    flex:none;display:flex;align-items:center;padding:2px 4px 8px;
+  }
+  .d-topbar .t{font-size:12px;color:var(--label-caption);letter-spacing:.5px}
+  .d-collapse{
+    margin-left:auto;width:28px;height:28px;display:grid;place-items:center;
+    border:none;border-radius:6px;background:transparent;cursor:pointer;
+    color:var(--label-secondary);font-size:13px;
+  }
+  .d-collapse:hover{background:var(--hover)}
+
+  .sec{border:1px solid var(--border-l1);border-radius:12px;background:var(--nb-00);box-shadow:var(--shadow-lv2)}
+  .sec-head{
+    display:flex;align-items:center;gap:6px;height:36px;padding:0 12px;cursor:pointer;
+    user-select:none;
+  }
+  .sec-head .chev{
+    flex:none;width:14px;text-align:center;font-size:10px;color:var(--label-secondary);
+  }
+  .sec-head .t{font-size:13px;font-weight:500;color:var(--label-primary)}
+  .sec-head .v{
+    margin-left:auto;font-size:12px;color:var(--label-tertiary);
+    font-variant-numeric:tabular-nums;white-space:nowrap;
+  }
+  .sec-body{padding:2px 12px 12px;border-top:1px solid var(--border-l1)}
+  .sec-head.open .chev{transform:rotate(90deg)}
+
+  /* Cockpit 组体 */
+  .ck-head{display:flex;align-items:center;gap:10px;padding-top:10px}
+  .ck-ring{position:relative;width:44px;height:44px;flex:none}
+  .ck-ring svg{transform:rotate(-90deg)}
+  .ck-ring .rv{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:500;color:var(--label-primary);font-variant-numeric:tabular-nums;
+  }
+  .ck-fig{margin-left:auto;text-align:right}
+  .ck-fig .p{font-size:14px;font-weight:500;color:var(--label-primary);font-variant-numeric:tabular-nums}
+  .ck-fig .l{font-size:12px;color:var(--label-tertiary)}
+  .ck-bar{
+    display:flex;gap:1px;margin:10px 0;height:4px;border-radius:999px;
+    background:var(--hover);overflow:hidden;
+  }
+  .ck-bar i{flex:none;height:100%;border-radius:1px}
+  .ck-rows .r{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:2px 0;font-size:12px;line-height:20px}
+  .ck-rows .r .k{color:var(--label-secondary);display:flex;align-items:center;gap:6px}
+  .ck-rows .r .k .sw{width:8px;height:8px;border-radius:2px;flex:none}
+  .ck-rows .r .v{color:var(--label-primary);font-variant-numeric:tabular-nums}
+  .ck-rows .r .v.hi{color:var(--green-500);font-weight:500}
+  .ck-div{height:1px;background:var(--border-l1);margin:8px 0}
+
+  /* 检查点组体 */
+  .cp-row{display:flex;align-items:center;gap:8px;padding:6px 0}
+  .cp-dot{
+    flex:none;width:7px;height:7px;border-radius:50%;
+    border:1.5px solid var(--nb-400);background:var(--nb-00);
+  }
+  .cp-row:first-child .cp-dot{border-color:var(--ds-500);background:var(--ds-500)}
+  .cp-body{flex:1;min-width:0}
+  .cp-t{font-size:13px;line-height:20px;color:var(--label-primary);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cp-m{font-size:12px;line-height:17px;color:var(--label-caption)}
+  .cp-rb{
+    flex:none;font-size:11px;line-height:16px;color:var(--label-tertiary);
+    border:1px solid var(--border-l2);border-radius:999px;padding:2px 8px;
+  }
+
+  /* 工具计数组体 */
+  .tl-row{display:flex;align-items:center;gap:8px;padding:3px 0}
+  .tl-row .n{font-family:var(--font-code);font-size:12px;color:var(--label-secondary);width:44px;flex:none}
+  .tl-row .bar{flex:1;height:4px;border-radius:999px;background:var(--hover);overflow:hidden}
+  .tl-row .bar i{display:block;height:100%;border-radius:999px}
+  .tl-row .c{flex:none;width:20px;text-align:right;font-size:12px;color:var(--label-primary);font-variant-numeric:tabular-nums}
+
+  /* 事件管线组体 */
+  .ev-row{display:flex;align-items:center;gap:8px;font-size:12px;line-height:18px;color:var(--label-secondary);padding:2px 0}
+  .ev-row i{width:7px;height:7px;border-radius:50%;flex:none}
+  .ev-row .n{font-variant-numeric:tabular-nums;margin-left:auto;color:var(--label-tertiary)}
+
+  /* 收起态 44px 细条 */
+  .d-rail{
+    flex-direction:column;align-items:center;gap:4px;padding:10px 0;height:100%;
+  }
+  .rail-btn{
+    width:36px;height:36px;display:grid;place-items:center;flex:none;
+    border:none;border-radius:8px;background:transparent;cursor:pointer;
+    color:var(--label-tertiary);font-size:14px;position:relative;
+  }
+  .rail-btn:hover{background:var(--hover);color:var(--label-primary)}
+  .rail-btn .mini{position:absolute;right:4px;bottom:4px;width:6px;height:6px;border-radius:50%}
+  .rail-expand{
+    width:36px;height:36px;display:grid;place-items:center;flex:none;
+    border:none;border-radius:8px;background:transparent;cursor:pointer;
+    color:var(--label-secondary);font-size:13px;margin-bottom:4px;
+  }
+  .rail-expand:hover{background:var(--hover)}
+
+  /* ---- ⑤ 底部状态条（26px） ---- */
+  .statusbar{
+    flex:none;height:26px;display:flex;align-items:center;gap:0;
+    padding:0 14px;background:var(--bg-base);
+    border-top:1px solid var(--border-l1);
+    font-size:12px;line-height:17px;color:var(--label-tertiary);
+    user-select:none;white-space:nowrap;
+  }
+  .sb{display:flex;align-items:center;gap:6px}
+  .sb-sep{width:1px;height:10px;background:var(--border-l2);margin:0 10px;flex:none}
+  .sb .dot{width:7px;height:7px;border-radius:50%;background:var(--green-500);flex:none}
+  .sb .minibar{
+    width:56px;height:4px;border-radius:999px;background:var(--hover);overflow:hidden;flex:none;
+  }
+  .sb .minibar i{display:block;height:100%;width:42%;background:var(--nb-400);border-radius:999px}
+  .sb .num{font-variant-numeric:tabular-nums}
+  .sb-right{margin-left:auto;display:flex;align-items:center}
+  .sb .proto{
+    font-size:11px;line-height:16px;color:var(--label-tertiary);
+    border:1px solid var(--border-l2);border-radius:6px;padding:1px 6px;
+  }
+  .sb .branch{font-family:var(--font-code)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ① 标题栏：仅面包屑 + 面板切换 + 窗口控制（可拖拽区） -->
+  <div class="titlebar">
+    <div class="crumbs">
+      <span class="crumb">会话</span>
+      <span class="crumb-sep">/</span>
+      <span class="crumb cur">重构缓存层 · 边界压缩</span>
+    </div>
+    <div class="tb-right">
+      <button class="tb-btn" id="tbToggle" title="收起/展开右侧面板">⇥</button>
+      <span class="tb-sep"></span>
+      <button class="tb-btn">─</button>
+      <button class="tb-btn">▢</button>
+      <button class="tb-btn">✕</button>
+    </div>
+  </div>
+
+  <div class="frame">
+    <!-- 侧栏 -->
+    <aside class="sidebar">
+      <div class="logoRow">
+        <span class="mark">✦</span>
+        <div>
+          <div class="name">天枢</div>
+          <div class="sub">把星辰带给每一位开发者</div>
+        </div>
+      </div>
+      <div class="domain">
+        <span class="star">✦</span><b>天权</b><span>· 认知星域</span><span class="chev">▾</span>
+      </div>
+
+      <div class="side-scroll">
+        <!-- ② 项目列表 -->
+        <div class="grp">项目</div>
+        <div class="prow selected">
+          <span class="picon" style="background:var(--ds-500)">T</span>
+          <span class="t">Tianshu-harness</span>
+          <span class="cnt">6</span>
+        </div>
+        <div class="prow">
+          <span class="picon" style="background:var(--violet-400)">D</span>
+          <span class="t">deepseek-harness</span>
+          <span class="cnt">12</span>
+        </div>
+        <div class="prow">
+          <span class="picon" style="background:var(--green-500)">A</span>
+          <span class="t">AI-Pet</span>
+          <span class="cnt">3</span>
+        </div>
+        <div class="newSession"><span class="plus">＋</span>新建会话</div>
+
+        <!-- ③ 最近对话（当前项目） -->
+        <div class="grp">最近对话 · Tianshu-harness</div>
+        <div class="srow"><span class="slot"><span class="sd sd-run"></span></span><span class="t">修复登录页样式回归</span><span class="meta">14:32</span></div>
+        <div class="srow selected"><span class="slot"><span class="sd sd-wait"></span></span><span class="t">重构缓存层 · 边界压缩</span><span class="meta">13:58</span></div>
+        <div class="srow"><span class="slot"><span class="sd sd-done"></span></span><span class="t">Git 工作台 PR 审查</span><span class="meta">11:20</span></div>
+        <div class="srow"><span class="slot"><span class="sd sd-done"></span></span><span class="t">analysis-reports 文档生成</span><span class="meta">昨天</span></div>
+        <div class="srow"><span class="slot"><span class="sd sd-done"></span></span><span class="t">SSE 重连 seq 去重验证</span><span class="meta">昨天</span></div>
+        <div class="srow"><span class="slot"><span class="sd sd-done"></span></span><span class="t">审批回执 remember 语义</span><span class="meta">周二</span></div>
+      </div>
+
+      <div class="side-foot">
+        <div class="frow"><span class="ico">⏱</span>定时任务<span class="cnt">3</span></div>
+        <div class="frow"><span class="ico">⚙</span>设置</div>
+      </div>
+    </aside>
+
+    <!-- 中栏 -->
+    <section class="center">
+      <div class="conv">
+        <div class="conv-col">
+
+          <div class="userRow">
+            <div class="userStack">
+              <div class="ububble">把 compact 的边界压缩阈值从 800K 调到 500K，并更新相关测试</div>
+              <div class="u-meta">14:41:07</div>
+            </div>
+          </div>
+
+          <div class="flowrow">
+            <div class="fr-line">
+              <span class="fr-lead">▸</span>
+              <span class="fr-title">已思考</span>
+              <span class="fr-sep"></span>
+              <span class="fr-sum">阈值在 <code>src/compact/boundary.ts</code> 里以常量定义，测试第 42 行有硬编码断言，需要一并调整……</span>
+              <span class="fr-state">4.2s</span>
+            </div>
+          </div>
+
+          <div class="md">已定位。阈值常量在 <code>src/compact/boundary.ts</code> 的 <code>BOUNDARY_TOKENS</code>，相关断言共 4 处。先跑一遍现有测试确认基线，再改常量并同步用例。</div>
+
+          <div class="flowrow">
+            <div class="fr-line">
+              <span class="fr-lead">▾</span>
+              <span class="fr-title">Bash</span>
+              <span class="fr-sep"></span>
+              <span class="fr-sum"><code>npm test --prefix src/compact</code></span>
+              <span class="fr-state">✓ 2.4s</span>
+            </div>
+            <div class="termcard">
+              <div class="tc-banner"><span>$ npm test --prefix src/compact</span><span class="ok">exit 0</span></div>
+              <div class="tc-body"><span class="p"> PASS </span><span class="v">src/compact/boundary.test.ts</span>
+<span class="p"> PASS </span><span class="v">src/compact/compress.test.ts</span>
+<span class="d">Tests: 14 passed, 14 total · 2.4s</span></div>
+            </div>
+          </div>
+
+          <div class="flowrow">
+            <div class="fr-line">
+              <span class="fr-lead">▾</span>
+              <span class="fr-title">Edit</span>
+              <span class="fr-sep"></span>
+              <span class="fr-sum"><code>src/compact/boundary.ts</code></span>
+              <span class="fr-state">+2 −2</span>
+            </div>
+            <div class="diffblock">
+              <div class="db-body">
+<div class="db-line db-path">src/compact/boundary.ts</div>
+<div class="db-line db-ctx">  // 边界压缩触发阈值（tokens）</div>
+<div class="db-line db-del">- export const BOUNDARY_TOKENS = 800_000;</div>
+<div class="db-line db-add">+ export const BOUNDARY_TOKENS = 500_000;</div>
+<div class="db-line db-del">- export const BOUNDARY_MARGIN = 0.9; // 90% 预警</div>
+<div class="db-line db-add">+ export const BOUNDARY_MARGIN = 0.85; // 85% 预警</div>
+<div class="db-line db-ctx">  export const KEEP_TAIL = 32_000;</div>
+              </div>
+              <div class="db-foot">└ +2 −2 · 1 个文件</div>
+            </div>
+          </div>
+
+          <div class="stream">常量已更新，正在同步调整 boundary.test.ts 中的硬编码断言与预警水位用例<span class="caret"></span></div>
+
+        </div>
+      </div>
+
+      <!-- 审批面板 + ④ composer（同栏宽并存） -->
+      <div class="dock">
+        <div class="dock-col">
+          <div class="approval">
+            <div class="ap-strip">
+              <span class="adot"></span>
+              <span>需要审批 · Bash</span>
+              <span class="hang">挂起 12s</span>
+            </div>
+            <div class="ap-body">
+              <div class="ap-headline">允许执行以下命令？</div>
+              <div class="ap-cmd">npm test --prefix src/compact -- --runInBand</div>
+            </div>
+            <div class="ap-actions">
+              <button class="btn ghost">拒绝</button>
+              <button class="btn outline">始终允许</button>
+              <button class="btn primary">允许一次</button>
+            </div>
+          </div>
+
+          <div class="composer">
+            <div class="cm-input">给天枢发送消息… <span class="kbd">Shift+Enter</span> 换行</div>
+            <div class="cm-row">
+              <div class="cm-tools">
+                <button class="cm-ico" title="附件">📎</button>
+                <button class="cm-ico ghost" title="引用文件">@</button>
+                <button class="cm-ico ghost" title="图片">🖼</button>
+              </div>
+              <div class="cm-trailing">
+                <button class="cm-model">DeepSeek V4 · 推理 high</button>
+                <button class="cm-send" title="发送">➤</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ⑥ 右栏：折叠组式详情栏 + 可收起 -->
+    <aside class="details">
+      <div class="d-expanded">
+        <div class="d-topbar">
+          <span class="t">详情</span>
+          <button class="d-collapse" id="dCollapse" title="收起面板">»</button>
+        </div>
+
+        <div class="sec">
+          <div class="sec-head open" data-sec>
+            <span class="chev">▸</span><span class="t">上下文占用</span><span class="v">42%</span>
+          </div>
+          <div class="sec-body">
+            <div class="ck-head">
+              <div class="ck-ring">
+                <svg width="44" height="44" viewBox="0 0 44 44">
+                  <circle cx="22" cy="22" r="19" fill="none" stroke="rgba(0,0,0,.12)" stroke-width="2.5"/>
+                  <circle cx="22" cy="22" r="19" fill="none" stroke="#81858C" stroke-width="2.5"
+                    stroke-linecap="round" stroke-dasharray="119.38" stroke-dashoffset="69.24"/>
+                </svg>
+                <span class="rv">42%</span>
+              </div>
+              <div>
+                <div style="font-size:13px;color:var(--label-primary);font-weight:500">210K / 500K</div>
+                <div style="font-size:12px;color:var(--label-tertiary)">tokens</div>
+              </div>
+              <div class="ck-fig">
+                <div class="p">¥0.13</div>
+                <div class="l">本轮成本</div>
+              </div>
+            </div>
+            <div class="ck-bar">
+              <i style="width:43%;background:var(--nb-400)"></i>
+              <i style="width:36%;background:var(--blue-450)"></i>
+              <i style="width:21%;background:var(--violet-400)"></i>
+            </div>
+            <div class="ck-rows">
+              <div class="r"><span class="k"><span class="sw" style="background:var(--nb-400)"></span>系统提示词</span><span class="v">18%</span></div>
+              <div class="r"><span class="k"><span class="sw" style="background:var(--blue-450)"></span>对话历史</span><span class="v">15%</span></div>
+              <div class="r"><span class="k"><span class="sw" style="background:var(--violet-400)"></span>工具结果</span><span class="v">9%</span></div>
+            </div>
+            <div class="ck-div"></div>
+            <div class="ck-rows">
+              <div class="r"><span class="k">缓存命中率</span><span class="v hi">96.8%</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-head open" data-sec>
+            <span class="chev">▸</span><span class="t">检查点</span><span class="v">3 个 · 可回滚</span>
+          </div>
+          <div class="sec-body">
+            <div class="cp-row">
+              <span class="cp-dot"></span>
+              <div class="cp-body">
+                <div class="cp-t">阈值常量修改后</div>
+                <div class="cp-m">14:41:22 · #cp-3 · 2 文件</div>
+              </div>
+              <span class="cp-rb">回滚</span>
+            </div>
+            <div class="cp-row">
+              <span class="cp-dot"></span>
+              <div class="cp-body">
+                <div class="cp-t">测试基线确认</div>
+                <div class="cp-m">14:40:58 · #cp-2 · 0 文件</div>
+              </div>
+              <span class="cp-rb">回滚</span>
+            </div>
+            <div class="cp-row">
+              <span class="cp-dot"></span>
+              <div class="cp-body">
+                <div class="cp-t">会话开始</div>
+                <div class="cp-m">13:58:11 · #cp-1</div>
+              </div>
+              <span class="cp-rb">回滚</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-head" data-sec>
+            <span class="chev">▸</span><span class="t">工具调用</span><span class="v">35 次</span>
+          </div>
+          <div class="sec-body" hidden>
+            <div class="tl-row"><span class="n">bash</span><span class="bar"><i style="width:78%;background:var(--nb-750)"></i></span><span class="c">14</span></div>
+            <div class="tl-row"><span class="n">edit</span><span class="bar"><i style="width:50%;background:var(--blue-450)"></i></span><span class="c">9</span></div>
+            <div class="tl-row"><span class="n">read</span><span class="bar"><i style="width:39%;background:var(--violet-400)"></i></span><span class="c">7</span></div>
+            <div class="tl-row"><span class="n">grep</span><span class="bar"><i style="width:28%;background:var(--nb-400)"></i></span><span class="c">5</span></div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-head" data-sec>
+            <span class="chev">▸</span><span class="t">事件管线 · AG-UI</span><span class="v">5 类事件</span>
+          </div>
+          <div class="sec-body" hidden>
+            <div class="ev-row"><i style="background:#5B8DEF"></i>lifecycle<span class="n">RUN_STARTED</span></div>
+            <div class="ev-row"><i style="background:#3EC6C9"></i>text<span class="n">流式中</span></div>
+            <div class="ev-row"><i style="background:#A06CF2"></i>tool<span class="n">CALL 待审批</span></div>
+            <div class="ev-row"><i style="background:#43C678"></i>state<span class="n">已同步</span></div>
+            <div class="ev-row"><i style="background:#F06FA8"></i>custom<span class="n">checkpoint</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 收起态：44px 细条 -->
+      <div class="d-rail">
+        <button class="rail-expand" id="railExpand" title="展开面板">«</button>
+        <button class="rail-btn" title="上下文占用 42%">◔<span class="mini" style="background:var(--nb-400)"></span></button>
+        <button class="rail-btn" title="检查点 · 3 个">↩<span class="mini" style="background:var(--ds-500)"></span></button>
+        <button class="rail-btn" title="工具调用 · 35 次">⌘<span class="mini" style="background:var(--violet-400)"></span></button>
+        <button class="rail-btn" title="事件管线 · AG-UI">✦<span class="mini" style="background:var(--green-500)"></span></button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ⑤ 底部状态条 -->
+  <footer class="statusbar">
+    <span class="sb">⚡ <span class="num">42 tok/s</span></span>
+    <span class="sb-sep"></span>
+    <span class="sb">上下文 <span class="num">210K/500K</span><span class="minibar"><i></i></span></span>
+    <span class="sb-sep"></span>
+    <span class="sb">缓存命中 <span class="num">96.8%</span></span>
+    <span class="sb-sep"></span>
+    <span class="sb">本轮 <span class="num">¥0.13</span></span>
+    <div class="sb-right">
+      <span class="sb branch">⎇ main*</span>
+      <span class="sb-sep"></span>
+      <span class="sb">会话库隔离</span>
+      <span class="sb-sep"></span>
+      <span class="sb">检查点已启用</span>
+      <span class="sb-sep"></span>
+      <span class="sb"><span class="dot"></span>SSE 已连接</span>
+      <span class="sb-sep"></span>
+      <span class="sb"><span class="proto">AG-UI v1</span></span>
+    </div>
+  </footer>
+</div>
+
+<script>
+  // ⑥ 右栏收起/展开：标题栏钮、面板 » 钮、细条 « 钮均可切换；#collapsed 直接进入收起态
+  function toggleDetails(){ document.body.classList.toggle('details-collapsed'); }
+  document.getElementById('tbToggle').addEventListener('click', toggleDetails);
+  document.getElementById('dCollapse').addEventListener('click', toggleDetails);
+  document.getElementById('railExpand').addEventListener('click', toggleDetails);
+  if (location.hash === '#collapsed') document.body.classList.add('details-collapsed');
+
+  // 折叠组开合
+  document.querySelectorAll('[data-sec]').forEach(function(head){
+    head.addEventListener('click', function(){
+      var body = head.nextElementSibling;
+      var open = head.classList.toggle('open');
+      if (body) body.hidden = !open;
+    });
+  });
+</script>
+</body>
+</html>

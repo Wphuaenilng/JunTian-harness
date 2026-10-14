@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useT, type LocaleKey } from '@tianshu/locale'
 import {
   SidecarError,
+  createLatestGate,
   localBranches,
   type BranchInfo,
   type GitChange,
@@ -12,6 +13,8 @@ import {
   type CommitEntry,
 } from '@tianshu/client-core'
 import { DiffBlock, diffStats, parseUnifiedDiff } from '@tianshu/ui-primitives'
+
+import { checkpointTitle, newestIndex } from './checkpoints.ts'
 
 export interface CheckpointPanelProps {
   api: SidecarClient
@@ -39,13 +42,16 @@ export function CheckpointPanel({ api, sessionId, onRewound }: CheckpointPanelPr
   const [pending, setPending] = useState<RewindPoint | null>(null)
   const [rollbackFiles, setRollbackFiles] = useState(false)
   const [busy, setBusy] = useState(false)
+  // 换会话时旧那一发的落地不许写回：点线的时间窗足够长，长到能真的反序落地。
+  const pointsGate = useMemo(() => createLatestGate(), [])
 
   const reload = useCallback(() => {
-    if (!sessionId) { setPoints([]); return }
+    if (!sessionId) { pointsGate.invalidate(); setPoints([]); return }
+    const token = pointsGate.begin()
     void api.rewindPoints(sessionId)
-      .then((p) => { setPoints(p); setError(null) })
-      .catch((e: Error) => setError({ key: 'git.loadPointsFailed', message: e.message }))
-  }, [api, sessionId])
+      .then((p) => { if (!pointsGate.isCurrent(token)) return; setPoints(p); setError(null) })
+      .catch((e: Error) => { if (!pointsGate.isCurrent(token)) return; setError({ key: 'git.loadPointsFailed', message: e.message }) })
+  }, [api, sessionId, pointsGate])
 
   useEffect(reload, [reload])
 
@@ -64,6 +70,7 @@ export function CheckpointPanel({ api, sessionId, onRewound }: CheckpointPanelPr
     }
   }
 
+  const newest = newestIndex(points)
   if (!sessionId) return <div className="ckp__empty">{t('git.selectSessionFirst')}</div>
 
   return (
@@ -80,14 +87,16 @@ export function CheckpointPanel({ api, sessionId, onRewound }: CheckpointPanelPr
       )}
       <ol className="ckp__list">
         {points.map((p) => (
-          <li key={`${p.index}-${p.seq}`} className={`ckp__item${pending?.index === p.index ? ' ckp__item--pending' : ''}`}>
-            <div className="ckp__meta">
-              <span>#{p.index}</span>
-              <span>seq {p.seq}</span>
-              <span>{new Date(p.timestamp).toLocaleTimeString()}</span>
+          <li key={`${p.index}-${p.seq}`} className={`ckp__item${pending?.index === p.index ? ' ckp__item--pending' : ''}${p.index === newest ? ' ckp__item--newest' : ''}`}>
+            <span className="ckp__dot" aria-hidden="true" />
+            <div className="ckp__body">
+              <div className="ckp__title" title={p.content}>{checkpointTitle(p.content, t('git.cpUntitled', { seq: p.seq }))}</div>
+              <div className="ckp__meta">{t('git.cpMeta', { index: p.index, seq: p.seq, time: new Date(p.timestamp).toLocaleTimeString() })}</div>
             </div>
-            <div className="ckp__content">{p.content.slice(0, 160)}</div>
-            {pending?.index === p.index ? (
+            {pending?.index !== p.index && (
+              <button className="ckp__rb" disabled={busy} onClick={() => setPending(p)}>{t('git.rewindTo')}</button>
+            )}
+            {pending?.index === p.index && (
               <div className="ckp__confirm">
                 <label>
                   <input type="checkbox" checked={rollbackFiles} onChange={(e) => setRollbackFiles(e.target.checked)} />
@@ -100,8 +109,6 @@ export function CheckpointPanel({ api, sessionId, onRewound }: CheckpointPanelPr
                   <button className="ckp__btn" disabled={busy} onClick={() => setPending(null)}>{t('git.cancel')}</button>
                 </div>
               </div>
-            ) : (
-              <button className="ckp__btn" disabled={busy} onClick={() => setPending(p)}>{t('git.rewindTo')}</button>
             )}
           </li>
         ))}
@@ -202,21 +209,30 @@ export function GitPanel({ api, sessionId, cwd, canMergeBack = false }: GitPanel
   const [confirmPush, setConfirmPush] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  const scope: GitScope | null = cwd ? { cwd } : sessionId ? { sessionId } : null
+  // `scope` 必须是**记忆化**的值而不是渲染期的对象字面量：它进 `reload` 的依赖，而 `reload` 进
+  // `useEffect` 的依赖——每次渲染都新建一个对象，等于每次渲染都重读一次，而读回又 setState → 再渲染。
+  // 浏览器里量到的就是那个环：/git-probe.html 挂载 3.1 秒内三个读各发了 44933 次。
+  const scope = useMemo<GitScope | null>(() => (cwd ? { cwd } : sessionId ? { sessionId } : null), [cwd, sessionId])
   const staged = useMemo(() => (snap?.changes ?? []).filter(isStaged), [snap])
   const clean = (snap?.changes ?? []).length === 0
+  const workGate = useMemo(() => createLatestGate(), [])
+  const diffGate = useMemo(() => createLatestGate(), [])
 
   const reload = useCallback((): void => {
-    if (!scope) { setSnap(null); setCommits([]); setBranches([]); return }
+    if (!scope) { workGate.invalidate(); setSnap(null); setCommits([]); setBranches([]); return }
+    const token = workGate.begin()
     void Promise.all([api.workbenchSnapshot(scope), api.workbenchHistory(scope, 0, 8), api.workbenchBranches(scope)])
       .then(([s, h, b]) => {
+        if (!workGate.isCurrent(token)) return
         setSnap(s)
         setCommits(h.commits)
         setBranches(b.branches)
-        if (!remote && s.repository.remotes[0]) setRemote(s.repository.remotes[0].name)
+        // 首载补默认远端：用函数式 set，`remote` 就不必进依赖（进了就等于"每次设上再重读一轮"）。
+        const firstRemote = s.repository.remotes[0]
+        if (firstRemote) setRemote((cur) => cur || firstRemote.name)
       })
-      .catch((e: unknown) => setError(readFailure(e, 'git.loadRepoFailed')))
-  }, [api, remote, scope])
+      .catch((e: unknown) => { if (!workGate.isCurrent(token)) return; setError(readFailure(e, 'git.loadRepoFailed')) })
+  }, [api, scope, workGate])
 
   useEffect(reload, [reload])
 
@@ -240,14 +256,18 @@ export function GitPanel({ api, sessionId, cwd, canMergeBack = false }: GitPanel
     if (!scope) return
     setSelected(path)
     setPatch('')
+    const token = diffGate.begin()
+    // 连点两个文件时，先点那个（大、慢）可能后落地——不拦就会把用户当前选中的文件换成另一个的
+    // diff。/git-probe.html 量的就是这一格（stub 让 slow.txt 晚 260ms 回包）。
     void api.workbenchDiff(scope, path)
       .then((d) => {
+        if (!diffGate.isCurrent(token)) return
         setPatch(d.diff)
         // Same split the server uses for its hunk index (git-workbench-routes.ts:59),
         // so "stage hunk 2" here means exactly hunk 2 there.
         setHunkCount(d.diff.split(/(?=^@@ )/m).length - 1)
       })
-      .catch((e: unknown) => setError(readFailure(e, 'git.diffFailed')))
+      .catch((e: unknown) => { if (!diffGate.isCurrent(token)) return; setError(readFailure(e, 'git.diffFailed')) })
   }
 
   if (!scope) return <div className="ckp__empty">{t('git.selectSessionFirst')}</div>
@@ -321,7 +341,7 @@ export function GitPanel({ api, sessionId, cwd, canMergeBack = false }: GitPanel
           <div className="wb__diff-head">
             <code>{selected}</code>
             {stats && <span className="wb__stats">+{stats.added} −{stats.removed}</span>}
-            <button className="fl__close" onClick={() => { setSelected(null); setPatch(''); setHunkCount(0) }}>✕</button>
+            <button className="wb__close" onClick={() => { setSelected(null); setPatch(''); setHunkCount(0) }}>✕</button>
           </div>
           {patch ? <DiffBlock patch={patch} /> : <p className="ckp__empty">{t('git.noDiff')}</p>}
           {hunkCount > 1 && (

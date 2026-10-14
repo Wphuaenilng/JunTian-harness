@@ -37,12 +37,13 @@ function statePaths(stateDir) {
 }
 
 function parseArgs(argv) {
-  const out = { port: 0, desktopDir: '', config: '', corsOrigins: [], stop: false, timeoutMs: 30_000, stateDir: '' }
+  const out = { port: 0, desktopDir: '', config: '', corsOrigins: [], stop: false, timeoutMs: 30_000, stateDir: '', isolateHome: false }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--port') out.port = Number(argv[++i])
     else if (a === '--desktop-dir') out.desktopDir = resolve(argv[++i])
     else if (a === '--state-dir') out.stateDir = argv[++i]
+    else if (a === '--isolate-home') out.isolateHome = true
     else if (a === '--config') out.config = resolve(argv[++i])
     else if (a === '--cors-origin') out.corsOrigins.push(argv[++i])
     else if (a === '--stop') out.stop = true
@@ -103,7 +104,7 @@ function pickFreePort() {
   })
 }
 
-async function waitHealthy(baseUrl, token, child, spawnErrRef, timeoutMs) {
+async function waitHealthy(baseUrl, token, child, spawnErrRef, timeoutMs, logPath) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     if (spawnErrRef.err) throw spawnErrRef.err
@@ -124,7 +125,12 @@ async function waitHealthy(baseUrl, token, child, spawnErrRef, timeoutMs) {
     if (probe?.readiness === 'failed') {
       const holder = probe.storeLockHolder
       const holderText = holder?.pid ? ` — holder pid ${holder.pid}${holder.hostname ? ` @ ${holder.hostname}` : ''}` : ''
-      throw new Error(`sidecar initialization failed (${probe.initializationError ?? 'unknown'}${holderText})`)
+      // 光把 pid 具名还不够——今天两次都卡在"有 pid，没下一步"。这里补一条**可行动**的句子，
+      // 但**不代杀进程**：命令行看不出那台是不是操作者自己正在用的实例，归属由人判断。
+      const nextStep = holder?.pid
+        ? `。下一步（由你决定，本脚本不杀进程）：taskkill //PID ${holder.pid}${holder.hostname ? `（在 ${holder.hostname} 上）` : ''}，或换一个空的 --state-dir`
+        : ''
+      throw new Error(`sidecar initialization failed (${probe.initializationError ?? 'unknown'}${holderText})${nextStep}`)
     }
     await new Promise((r) => setTimeout(r, 300))
   }
@@ -148,6 +154,20 @@ async function main() {
     ...process.env,
     RIVET_SERVER_TOKEN: token,
     RIVET_DESKTOP_DIR: desktopDir,
+  }
+  // The runtime keeps a second book of files under `rivetHome()/sessions/<slug>/…`
+  // (src/config/paths.ts:33-35 and :98-101) — and `rivetHome()` only moves when `RIVET_HOME` is set.
+  // With just RIVET_DESKTOP_DIR, an *isolated* run still wrote session directories into the
+  // operator's real ~/.rivet: measured here, nothing appeared under the temp home until
+  // RIVET_HOME was set. Opt-in rather than default, because the desktop shell legitimately runs
+  // against the user's own home (CLI transcripts, cache logs) and silently relocating that would
+  // change the shipped app's data layout — that is the owner's call, not a test harness's.
+  if (opts.isolateHome) {
+    env.RIVET_HOME = process.env.RIVET_HOME || join(desktopDir, 'rivet-home')
+    mkdirSync(env.RIVET_HOME, { recursive: true })
+    console.log(`rivet home: ${env.RIVET_HOME}`)
+  } else {
+    console.log(`rivet home: ${process.env.RIVET_HOME || '默认（操作者的 ~/.rivet）'} — 加 --isolate-home 才关进临时目录`)
   }
   // Provider credentials belong to a config file OUTSIDE the repo: the runtime's own
   // root is %LOCALAPPDATA%\.rivet, and a repo-local config.json is not gitignored, so
@@ -174,6 +194,10 @@ async function main() {
   const runtime = daemonRuntime()
   delete env.ELECTRON_RUN_AS_NODE
   console.log(`daemon: ${runtime.bin} (${runtime.version}, ${runtime.why})`)
+  // `--state-dir` 搬的是这两个记账文件；desktopDir 与 RIVET_HOME 上面都已 recursive 建过，唯独这个
+  // 目录此前隐含"caller 已经建好"——传一个尚不存在的 --state-dir 就会在 openSync 处 ENOENT
+  //（2026-10-12 实测：诊断时手起一台就是这么死的）。放在 stop 分支之后，所以 `--stop` 不会建目录。
+  mkdirSync(dirname(logPath), { recursive: true })
   const logFd = openSync(logPath, 'w')
   const child = spawn(runtime.bin, [entry, 'serve', '--port', String(port)], {
     cwd: repoRoot,
@@ -189,7 +213,18 @@ async function main() {
     spawnErrRef.err = err.code === 'ENOENT' ? new Error(`cannot spawn node: ${err.message}`) : err
   })
 
-  const health = await waitHealthy(baseUrl, token, child, spawnErrRef, opts.timeoutMs)
+  let health
+  try {
+    health = await waitHealthy(baseUrl, token, child, spawnErrRef, opts.timeoutMs, logPath)
+  } catch (e) {
+    // 失败路径不许漏进程：这台是**本函数刚 spawn 的**（不是别人的残留），按 pid 自收是本分。
+    // 以前这里什么都不做，于是每次"抢锁失败/就绪超时"都留下一台 readiness=failed 的 daemon——
+    // 2026-10-12 实测 before/after 计数 5→6 就是这么来的，而这类残留正是聚合偶发红（#120）的攒法。
+    // 下面那行现在有名有姓的门盯着：`ci-smoke.mjs` 的「撞锁那台自收」拿同一份 --desktop-dir 真起第二台，
+    // 数它退场后本仓 runtime 有没有多出一台——2026-10-13 把这行摘掉试过，判据红且多出的那台被数了出来。
+    try { process.kill(child.pid, 'SIGTERM') } catch { /* 已经自己走了 */ }
+    throw new Error(`${e.message}（已收掉本机刚起的 pid ${child.pid}，不留残留）`)
+  }
 
   const info = {
     port,

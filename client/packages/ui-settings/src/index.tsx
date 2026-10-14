@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useT, type LocaleKey } from '@tianshu/locale'
+import { createLatestGate } from '@tianshu/client-core'
 import type { SidecarClient, ApprovalConfig, DefaultModelConfig, DomainConfig, ProviderConfigList } from '@tianshu/client-core'
 
 export interface SettingsPanelProps {
@@ -32,16 +33,21 @@ export function SettingsPanel({ api, onClose }: SettingsPanelProps) {
   const [error, setError] = useState<Failure | null>(null)
   const [busy, setBusy] = useState(false)
 
+  // 四份配置一次读回，只许最新那一发落地：改一项就 reload 一次，连着改两项时旧的那发若后落地，
+  // 界面会退回改之前的值——看着像「保存没生效」。
+  const reloadGate = useMemo(() => createLatestGate(), [])
   const reload = useCallback(() => {
+    const token = reloadGate.begin()
     void Promise.all([
       api.getApprovalConfig(),
       api.getDefaultModelConfig(),
       api.getProviders(),
       api.getDomainConfig(),
     ]).then(([a, m, p, d]) => {
+      if (!reloadGate.isCurrent(token)) return
       setApproval(a); setModel(m); setProviders(p); setDomains(d)
-    }).catch((e: Error) => setError({ key: 'settings.readFailed', message: e.message }))
-  }, [api])
+    }).catch((e: Error) => { if (reloadGate.isCurrent(token)) setError({ key: 'settings.readFailed', message: e.message }) })
+  }, [api, reloadGate])
 
   useEffect(reload, [reload])
 

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>天枢 · 审批报警探针</title>
+</head>
+<body>
+  <!-- Developer page, not product surface: it renders the real <ApprovalPanel> twice over one
+       fixture, the only difference being the `stallAfterMs` prop (1ms vs one hour). That turns
+       §5.2-5's「报警样式从未被渲染过」into something a judgement can look at — the alarm element, its
+       text, and the fact that the quiet twin next to it does not show it. Building the alarm on a
+       shortened threshold does NOT prove a real gate ever sat unanswered for 30s; that half still
+       costs an upstream call. Built as a seventh vite input; nothing links to it. Measured by
+       `node scripts/check-live-geometry.mjs` (the 审批报警 anchors). -->
+  <div id="root"></div>
+  <script type="module" src="/src/stall-probe.tsx"></script>
+</body>
+</html>

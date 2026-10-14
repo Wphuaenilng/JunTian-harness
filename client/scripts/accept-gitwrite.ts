@@ -19,8 +19,8 @@ import { fileURLToPath } from 'node:url'
 import { SidecarClient, SidecarError, type GitScope } from '../packages/client-core/src/index.ts'
 
 const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const info = JSON.parse(readFileSync(join(clientRoot, '.sidecar-info.json'), 'utf8')) as { baseUrl: string; token: string }
-const api = new SidecarClient({ baseUrl: info.baseUrl, token: info.token })
+import { openInstance } from './lib-instance.ts'
+const { api, info } = openInstance('Git 工作台写路径（建会话 / worktree / 提交 / PR 草稿，全在临时仓库沙箱里）')
 
 const failures: string[] = []
 const check = (label: string, ok: boolean, detail = ''): void => {

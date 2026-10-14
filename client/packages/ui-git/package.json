@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Git-adjacent panels: shadow-checkpoint timeline with rewind, and (next) the workbench / PR flow.",
+  "description": "Git-adjacent panels: shadow-checkpoint timeline with rewind, and the workbench / commit / PR flow.",
   "exports": {
     ".": "./src/index.tsx",
     "./styles.css": "./src/styles.css"

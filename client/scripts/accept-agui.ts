@@ -16,10 +16,10 @@ import { AGUI_EVENT_TYPES, validateAguiStream, type AguiEvent } from '../package
 import { SidecarClient } from '../packages/client-core/src/index.ts'
 
 const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const info = JSON.parse(readFileSync(join(clientRoot, '.sidecar-info.json'), 'utf8')) as { baseUrl: string; token: string }
+import { openInstance } from './lib-instance.ts'
+const { api, info } = openInstance('AG-UI 端点真连 + 词表校验（回放历史事件，零花费）')
 const PROXY = process.env.AGUI_ORIGIN ?? 'http://127.0.0.1:5300'
 
-const api = new SidecarClient({ baseUrl: info.baseUrl, token: info.token })
 const sessions = await api.listSessions({ includeArchived: true })
 const target = (process.argv[2] ? sessions.find((s) => s.id === process.argv[2]) : undefined)
   ?? sessions.filter((s) => s.lastSeq >= 8).sort((a, b) => b.lastSeq - a.lastSeq)[0]

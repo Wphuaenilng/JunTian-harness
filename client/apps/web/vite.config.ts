@@ -44,7 +44,10 @@ export default defineConfig({
     port: 5310,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:5300',
+        // 默认打 5300；`RIVET_DEV_UPSTREAM` 让验证脚本能挑一个空闲端口，而不必去撞
+        // 操作者正在用的那台 serve-client——撞上了会拿到**别人实例**的 200，
+        // 把"没验成"读成"验过了"。
+        target: process.env.RIVET_DEV_UPSTREAM ?? 'http://127.0.0.1:5300',
         changeOrigin: false,
         // SSE must not be buffered by the dev proxy either.
         configure: (proxy) => {
@@ -66,6 +69,27 @@ export default defineConfig({
       input: {
         main: resolve(here, 'index.html'),
         probe: resolve(here, 'frame-probe.html'),
+        ctx: resolve(here, 'ctx-probe.html'),
+        bubble: resolve(here, 'bubble-probe.html'),
+        row: resolve(here, 'row-probe.html'),
+        // hl-probe.html: developer page proving shiki actually painted tokens in the browser
+        // (MarkdownBlock swallows highlight failures, so plain code looks like correct code).
+        hl: resolve(here, 'hl-probe.html'),
+        // stall-probe.html: developer page that finally *renders* the approval stall alarm §5.2-5
+        // promised — same panel and CSS, only the threshold prop differs between the two columns.
+        stall: resolve(here, 'stall-probe.html'),
+        // ime-probe.html: developer page that measures the Enter-to-send rule in a real browser —
+        // a composing Enter (IME candidate commit) must not send, a plain Enter must.
+        ime: resolve(here, 'ime-probe.html'),
+        // git-probe.html: developer page that counts how often the Git workbench re-reads itself
+        // (a render-period `scope` object made that loop), and whether a late diff can overwrite
+        // the file the user actually selected.
+        git: resolve(here, 'git-probe.html'),
+        // settings-probe.html: developer page that mounts the real <SettingsPanel> (no verifier
+        // ever opened the settings modal, so its reads had no browser evidence at all) and makes
+        // the latest-wins gate observable: a config read that lands late must not overwrite the
+        // mode the user just saved.
+        settings: resolve(here, 'settings-probe.html'),
       },
     },
   },

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>天枢 · 设置面板探针</title>
+</head>
+<body>
+  <!-- 开发者页面，不是产品面：它挂**真的** <SettingsPanel>，喂一个只实现那四份配置读与一处写的桩 client。
+       存在的理由是一条覆盖面事实：设置面板由宿主挂上，但**打开它需要人点「设置」**，所以所有看浏览器的
+       判定（像素门的锚点、配对普查、暗色跟随）历史上都没在它身上跑过——本轮刚给它接上的那道 latest-wins
+       闸门（`reloadGate`）也就没有任何浏览器证据。这一页把那条闸门变成可观察量：桩让**第二发**配置读
+       晚 300ms 落地，页面按"先改一档、立刻再改一档"的顺序点两次，屏上留下的必须是新那一档；
+       留下旧那一档就是"迟到的读回盖掉了用户刚刚保存的值"。
+       量的都是组件的取数时序，不是 sidecar 的配置语义——那部分由 accept-settings.ts 在隔离实例上量。第十个 vite 输入。 -->
+  <div id="root"></div>
+  <script type="module" src="/src/settings-probe.tsx"></script>
+</body>
+</html>

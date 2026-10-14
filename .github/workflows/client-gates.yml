@@ -1,0 +1,166 @@
+# client-gates.yml — the plan's 贯穿项 as a GitHub Actions job, wired on 2026-10-12.
+#
+# It used to sit in `client/scripts/` as `ci-client.workflow.yml.example`, because putting anything
+# into this repo's shared `.github/workflows/` is an infrastructure change the owner decides. On
+# 2026-10-12 that decision was given ("授权 mv 进共享 .github/workflows，只加不改现有 job"), and the
+# move is exactly that: this file is *added* next to `ci.yml`, and `ci.yml` is byte-unchanged
+# (verified with `git status --porcelain -- .github` at wiring time: only this new file plus the
+# deleted example are listed). Measured again the same way: `ci.yml`'s jobs stay `ci` /
+# `windows-smoke` / `cli-frontend`, all of which build and test the kernel — none of them touches
+# `client/`, so this job is the only place the client gates can go green in a pipeline.
+#
+# Everything below follows the house style of `.github/workflows/ci.yml` (setup-node@v4 with
+# node 24 and cache: npm, npm ci, explicit read-only permissions).
+#
+# What it runs is only what already passes locally as one command:
+#   node scripts/ci-smoke.mjs   → the drift gates listed below, then a KEYLESS sidecar boot:
+#                                 /health handshake, create session, GET /tasks, and the send path.
+#   gates: gen-protocol-types.mjs, protocol-ledger.mjs, check-nongoals.mjs, check-docs.mjs, check-traps.mjs, check-theme.mjs, check-layers.mjs, check-mockup-tokens.mjs, check-contrast.mjs, check-layout.mjs, check-scale.mjs, check-wire-mirror.mjs
+#
+# 那条 `# gates:` 不是给人抄的：`check:docs` 把它与 ci-smoke 源码里实际 spawnSync 的文件名**逐名双向
+# 对齐**——往 ci-smoke 里加一道门而不回来这里登记，会红；这里写一道 ci-smoke 已经不跑的门，也会红。
+# 接线之后这条判定不闭眼：`check:docs` 改成读**这份文件**做同样的逐名对齐（不是"mv 完就不再验文本"）。
+# （写这条的理由是它自己抓到的：示例曾停在「五道门」，而当时实际已经是九道。）
+#
+# Zero-spend is structural, not hopeful: ci-smoke writes an empty provider config for the
+# process and points RIVET_CONFIG_PATH at it (without that env override the runtime falls back
+# to the user's real config root, where a key may live), then skips the send step unless
+# /health reports configured:false. So a CI secret could not be billed by this job even if one
+# were present — and none is: no secrets are referenced here.
+#
+# The kernel must be built first: launch-sidecar.mjs looks for ../dist/cli/entry.js and says
+# so explicitly if it is missing.
+#
+# 本地按这份步骤表逐条排演过（2026-10-12，Windows + 本机 node；每条都是 exit 码 + 实测用时）：
+#   build:bundle 0 / 5s · corepack pnpm install --frozen-lockfile 0 / 0.3s · ci-smoke 0 / 12s
+#   （含无 key 冒烟那三条：boot exit=0、configured=false、空配置 prompt 自报 failed）
+#   pnpm test 0 / 2s · pnpm typecheck 0 / 7s · --filter @tianshu/app-web build 0 / 11s
+# 跑前后本仓 `serve --port` daemon 台数都是 5（这一趟没留下新残留）。唯一没排演的是 `npm ci`
+# 本身——它会清空并重装 node_modules，那是操作者的机器，我不按。
+# 排演当场抓到的一步红已写进上面那条注释：root `npm run build` 的打包尾巴依赖 native sqlite，
+# 本机 exit 1，而客户端门只需要 bundle，所以这道 job 不再跑那个脚本（判据由 `check:docs` 从
+# 这份文件里派生每个 `npm run` 目标去根 package.json 查存在性，改名就会红）。
+
+name: client gates
+
+on:
+  # 这两份触发路径必须逐名相等（`check:docs` 有一条判定钉这个等式，2026-10-13）：这道 job 的判据会去
+  # 读根 `package.json` 的脚本名与 `src/server/protocol.ts` 那份镜像契约，PR 少一条路径就等于
+  # "改坏它的那次 PR 根本不跑这道 job"——漂移要等合并进 main 之后才红，那就不是门禁而是事后报告。
+  push:
+    paths:
+      - 'client/**'
+      - 'src/server/protocol.ts'   # the mirrored contract: change it and the drift gate must speak
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    paths:
+      - 'client/**'
+      - 'src/server/protocol.ts'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        # 根 package.json 的 engines 是 ">=24"（与 ci.yml 同档）。客户端单测直接用 node 跑
+        # .ts，靠的是 Node 的类型擦除，需要 22.18+/24。
+        node-version: [24]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Build the kernel the sidecar runs from
+        run: |
+          npm ci
+          # Deliberately build:bundle (tsup only), NOT the root `build`: that one ends in
+          # stage-runtime-deps, which hard-fails unless dist/native/better_sqlite3.node exists
+          # (measured on this machine 2026-10-12: `npm run build` exit 1 in 14s — pack-native
+          # skipped because node_modules/better-sqlite3 ships source only here — while
+          # `npm run build:bundle` exit 0 in 5s and produces the dist/cli/entry.js the sidecar
+          # needs). The client gates talk to the sidecar over HTTP; they never touch the
+          # packaged runtime, native sqlite staging or the sourcemap trim, so the job that
+          # guards the client must not go red over a release-packaging concern.
+          npm run build:bundle
+
+      # client/ has no `packageManager` field, so this uses corepack's default pnpm — the
+      # version this workspace was verified with locally is 12.10.1. If you want the job to
+      # be version-pinned, add packageManager to client/package.json (or pnpm/action-setup)
+      # rather than trusting a moving default.
+      - name: Enable corepack
+        working-directory: client
+        run: corepack enable
+
+      - name: Install workspace
+        working-directory: client
+        run: corepack pnpm install --frozen-lockfile   # client/pnpm-lock.yaml exists
+
+      - name: drift gates (the # gates list in the header), then keyless sidecar smoke
+        working-directory: client
+        run: node scripts/ci-smoke.mjs
+
+      - name: unit tests (node:test across the workspace)
+        working-directory: client
+        run: corepack pnpm test
+
+      - name: client-core typecheck
+        working-directory: client
+        run: corepack pnpm typecheck
+
+      - name: build the web bundle
+        working-directory: client
+        run: corepack pnpm --filter @tianshu/app-web build
+
+      # 这三台本来就是本地证据线 `verify:all` 里的步骤：零花费、纯 node、不要 Electron 也不要浏览器。
+      # 2026-10-12 你授权接 CI 之后把它们加进这道 job（`ci.yml` 一个字节没动，属"只加不改现有 job"）。
+      # 它们在本地整条跑里的通过状态与逐步耗时只在 `client/README.md` 的聚合快照那一处记（这里抄一
+      # 个数就会漂）。**没在 linux 上跑过**：第一次远端 run 若因环境差异红，那是这三台的 linux 首测，
+      # 不是客户端功能回归。
+      - name: REST + SSE surface audit (paths derived from client-core, keyless sidecar)
+        working-directory: client
+        run: node scripts/verify-rest-surface.mjs
+
+      - name: dev-mode shape (vite dev server + same-origin proxy two hops)
+        working-directory: client
+        run: node scripts/verify-dev-proxy.mjs
+
+      - name: zero-spend acceptance surface (schedule / settings / gitwrite / queue / tasks / history / reconnect / panel, isolated keyless instance)
+        working-directory: client
+        run: node scripts/verify-accept-zero.mjs
+
+      # Deliberately NOT run here — 这份名册由 `check:docs` 与 `verify-all.mjs` 的步骤表逐名对齐：
+      # 证据线上每一台都必须在下面出现并带一条理由，写了树里不存在的脚本名也算红。
+      #
+      # A) 这台 runner 上根本跑不了：
+      #  - verify-desktop.mjs / verify-desktop-store.mjs / verify-single-instance.mjs：要真
+      #    Electron 二进制（`apps/desktop/node_modules/electron`，本机是走 npmmirror 装的）+
+      #    CDP 端口 9223 + 托盘；ubuntu runner 上没有。
+      #  - check-live-geometry.mjs（像素门）：playwright-core + 本机 Edge。
+      #  - check-mockup-render.mjs（定稿设计资产可复现）：同样要 playwright-core + 本机 Edge，
+      #    且它读的是 analysis-reports/ 下那两张入库 PNG（本仓未跟踪，runner 上取不到）。
+      # B) 跑得动，但**故意红**，接进 CI 只会逼人把红改成假绿：
+      #  - check-live-geometry.mjs（等你定三条几何里的气泡/标题栏那两条）
+      #  - check-mockup-geometry.mjs（`check:geometry` 差集：三条几何决定）
+      # C) 曾经写在这里的三台（`verify-dev-proxy` / `verify-rest-surface` / `verify-accept-zero`）
+      #    已于 2026-10-12 接成上面的真步骤——你授权接 CI 之后，"加步骤等于改这道 job 的作用面"
+      #    这条自我克制就不再适用：它们本来就是本地 `verify:all` 里零花费、纯 node 的步骤。
+      #    现在名册与步骤表由 `check:docs` 两面对齐：一台要么出现在 `run:` 里真跑，要么留在下面
+      #    带理由；两边都写（写了名册却又真跑）或两边都不写（加了步骤忘了交代）都会红。
+      #    同一批里还有一条已改口的旧账：`check:contrast`（配色 AA）以前挂在上面 B 段名下，
+      #    写它"方向未定、故意红"。2026-10-12 裁定 ① 之后它是硬门且已绿，而且它本来就在
+      #    文件头那份 `# gates:` 名单里——ci-smoke 每跑一次它就 spawn 一次，所以这道 job 一直在跑它。
+      #    名册再留它就是第三类双记账（B 段的"不跑"与 gates 的"在跑"两头打脸），
+      #    而 `verify-all` 步骤表派生抓不到它（它不在那张表上），所以 `check:docs` 补了第三条判定：
+      #    名册点名的脚本名与 ci-smoke 实跑的漂移门有交集 ⇒ 红。
+      #  - 付费的那批（accept-stream / accept-reconnect / accept-approval 这类要 provider key 的）
+      #    与 stall-demo.mjs：这个 job 没有也不需要 key——零花费是结构性的，见上面那段。

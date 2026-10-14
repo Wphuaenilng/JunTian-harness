@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>天枢 · 会话行探针</title>
+</head>
+<body>
+  <!-- Developer page, not product surface: it mounts the real <SessionList> with a fixture record that
+       carries everything at once — a title long enough to ellipsise, a worktree branch longer than its
+       cap, and a pending-approvals badge. A real badge needs a run (an upstream call); this measures the
+       row composition itself, same standard as ctx-probe.html / bubble-probe.html. Built as a fourth
+       vite input; nothing links to it. Measured by `node scripts/check-live-geometry.mjs` (the badge row). -->
+  <div id="root"></div>
+  <script type="module" src="/src/row-probe.tsx"></script>
+</body>
+</html>

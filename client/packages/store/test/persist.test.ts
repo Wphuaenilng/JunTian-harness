@@ -82,22 +82,22 @@ test('streaming mirrors never touch localStorage; a layout change does', () => {
   // What apps/web actually does per streamed event: seq/generation mirrors and drafts move,
   // nothing persisted does. Without the subset guard this loop is 60 blocking writes.
   for (let seq = 1; seq <= 60; seq++) {
-    view.setState((state) => { state.lastSeq = seq; state.generation = 1 })
+    view.setState({ lastSeq: seq, generation: 1 })
     setDraft(view, 'sess-x', `typing ${seq}`)
   }
   assert.equal(writes, 0, `streaming must not persist (saw ${writes} writes)`)
 
-  view.setState((state) => { state.rightTab = 'git' })
+  view.setState({ rightTab: 'git' })
   assert.equal(writes, 1, 'a real layout change persists exactly once')
 
-  for (let seq = 61; seq <= 120; seq++) view.setState((state) => { state.lastSeq = seq })
+  for (let seq = 61; seq <= 120; seq++) view.setState({ lastSeq: seq })
   assert.equal(writes, 1, 'still exactly one write after more streaming')
 
-  view.setState((state) => { state.openSessionId = 'sess-y'; state.includeArchived = true })
+  view.setState({ openSessionId: 'sess-y', includeArchived: true })
   assert.equal(writes, 2)
 
   detach()
-  view.setState((state) => { state.rightTab = 'files' })
+  view.setState({ rightTab: 'files' })
   assert.equal(writes, 2, 'detach really unsubscribes')
   assert.deepEqual(loadView(s), { openSessionId: 'sess-y', includeArchived: true, rightTab: 'git', panels: { right: true } },
     'the blob reflects the last write, not the last state')

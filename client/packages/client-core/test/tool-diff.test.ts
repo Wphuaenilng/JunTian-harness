@@ -4,7 +4,9 @@ import { relativeToCwd, toolFilePath, localBranches, SessionModel } from '../src
 import type { Block, BranchInfo, GitRemote, SessionEvent, SessionEventType } from '../src/index.ts'
 
 function evt(seq: number, type: string, data: Record<string, unknown>): SessionEvent {
-  return { seq, ts: `2026-10-09T00:00:${String(seq).padStart(2, '0')}Z`, type: type as SessionEventType, data }
+  // SessionEvent.ts is an epoch number, not a string: the fixture used to hand it a
+  // timestamp string, which survived only because nothing here reads `ts`.
+  return { seq, ts: 1_760_000_000_000 + seq * 1000, type: type as SessionEventType, data }
 }
 
 const tool = (b: Block): Extract<Block, { kind: 'tool' }> => {

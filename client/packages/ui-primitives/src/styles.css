@@ -21,12 +21,15 @@
 
 .tp-diff { border: 1px solid var(--border-l2); border-radius: 8px; overflow: hidden; background: var(--bg-base); }
 .tp-diff__head { display: flex; gap: 10px; padding: 5px 10px; background: var(--bg-selector); font-size: 11.5px; font-family: var(--font-code); }
-.tp-diff__add { color: var(--ok); }
-.tp-diff__del { color: var(--danger); }
+/* 计数那两枚此前用通用的 --ok / --danger，压在头行的 --bg-selector 上量出来只有 4.19 / 4.31
+   （暗色 4.37 / 4.27），全部不到 4.5。改成差异自己的 owner token——它们本就是为"差异文字压在差异面上"
+   而按主题分叉的一对，放在这行同样过线（5.03 / 5.30 浅，9.69 / 6.10 暗）。 */
+.tp-diff__add { color: var(--diff-add-text); }
+.tp-diff__del { color: var(--diff-del-text); }
 .tp-diff__body { margin: 0; padding: 8px 10px; font-family: var(--font-code); font-size: 12px; line-height: 1.5; overflow: auto; max-height: 320px; display: block; }
 .tp-diff__line { display: block; white-space: pre; }
-.tp-diff__line--add { background: rgba(34, 197, 94, .10); color: var(--ok); }
-.tp-diff__line--del { background: rgba(236, 19, 19, .08); color: var(--danger); }
+.tp-diff__line--add { background: var(--diff-add-bg); color: var(--diff-add-text); }
+.tp-diff__line--del { background: var(--diff-del-bg); color: var(--diff-del-text); }
 .tp-diff__line--meta { color: var(--label-caption); }
 
 .tp-term {
@@ -36,4 +39,33 @@
 
 /* Sandboxed embedded view (MCP Apps 预留). The frame is always full-width and never
    scrollable itself — height is negotiated over the bridge, not fought with the page. */
-.tp-app { display: block; width: 100%; border: 1px solid var(--border-l2); border-radius: 8px; background: #FFF; overflow: hidden; }
+.tp-app { display: block; width: 100%; border: 1px solid var(--border-l2); border-radius: 8px; background: var(--bg-base); overflow: hidden; }
+
+/* 右栏折叠组，逐条照定稿图的 .sec / .sec-head / .chev / .t / .v / .sec-body：
+   12px 圆角卡片 + border-l1 + nb-00 底 + lv2 阴影、头 36px 高 padding 0 12 gap 6、
+   chev 14px 宽 10px 字（open 时 rotate 90°）、标题 13/500、读数值 12 靠右 tabular-nums、
+   组体 padding 2px 12px 12px 上边一条 border-l1。summary 的原生标记要清掉才能自绘 chevron。 */
+.tp-sec {
+  /* 组是 .app__secs（flex column）的子项：不给 min-width:0，组里任何长文本都会把卡片本身撑宽，
+     连带整栏出现可见溢出（用户实例上实测 details.tp-sec 286 > 265）。 */
+  min-width: 0;
+  border: 1px solid var(--border-l1); border-radius: var(--scale-card-radius); background: var(--bg-base);
+  box-shadow: var(--shadow-lv2);
+}
+.tp-sec__head {
+  display: flex; align-items: center; gap: 6px; height: var(--scale-group-head); padding: 0 12px; cursor: pointer;
+  user-select: none; list-style: none;
+}
+.tp-sec__head::-webkit-details-marker { display: none; }
+.tp-sec__chev { flex: none; width: 14px; text-align: center; font-size: 10px; color: var(--label-secondary); }
+.tp-sec--open .tp-sec__chev { transform: rotate(90deg); }
+.tp-sec__t { font-size: 13px; font-weight: 500; color: var(--label-primary); }
+.tp-sec__v {
+  margin-left: auto; font-size: 12px; color: var(--label-tertiary);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.tp-sec__body { padding: 2px 12px 12px; border-top: 1px solid var(--border-l1); }
+/* 原生 `<option>` 由 UA 上色，浏览器给的读数在暗色主题下仍是黑字压白底——普查把它当成产品面报了
+   两次（`0,0,0` / `109,109,109` 不在任一 ramp 里）。这里显式接手：option 用正文墨色与页面底色，
+   于是这一族从"UA 画的、无法评"变成"我们画的、在配对表里评得到"。 */
+select option { color: var(--label-primary); background: var(--bg-base); }

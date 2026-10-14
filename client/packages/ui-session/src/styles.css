@@ -1,22 +1,47 @@
 .us { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg-sidebar); border-right: 1px solid var(--border-l1); }
-.us__brand { padding: 14px 16px 10px; display: flex; align-items: baseline; gap: 8px; }
-.us__brand b { font-size: 15px; letter-spacing: .2px; color: var(--label-primary); }
-.us__brand span { font-size: 11px; color: var(--label-tertiary); }
-.us__new { margin: 0 12px 12px; padding: 8px 10px; border: none; border-radius: 8px; background: var(--nb-1000); color: #fff; font: inherit; font-size: 13px; cursor: pointer; }
+/* 品牌行照定稿图的 .logoRow：60px 高、gap 8、28px 圆角 8 的 ds-500 mark、名 16/600 字距 1px、副标语 11px caption。
+   图上 mark 里是字母缩写，我们用一个汉字「天」——品牌只在侧栏头部一处这条不变（check:layout 在数）。 */
+.us__brand { min-height: var(--scale-brand-row); padding: 0 12px; display: flex; align-items: center; gap: 8px; }
+.us__mark {
+  flex: none; width: var(--scale-brand-mark); height: var(--scale-brand-mark); border-radius: var(--scale-mark-radius); background: var(--ds-500); color: var(--on-accent);
+  font-size: 14px; display: flex; align-items: center; justify-content: center;
+}
+.us__brand b { font-size: 16px; font-weight: 600; letter-spacing: 1px; color: var(--label-primary); }
+.us__brand span:not(.us__mark) { font-size: 11px; color: var(--label-caption); }
+.us__new { margin: 0 12px 12px; padding: 8px 10px; border: none; border-radius: 8px; background: var(--nb-1000); color: var(--on-accent); font: inherit; font-size: 13px; cursor: pointer; }
 .us__filter { display: flex; align-items: center; gap: 6px; margin: 0 14px 8px; font-size: 11.5px; color: var(--label-tertiary); cursor: pointer; }
 .us__filter input { accent-color: var(--accent); margin: 0; }
 .us__list { flex: 1; overflow: auto; padding: 0 8px; }
-.us__row { padding: 8px 9px; border-radius: 8px; cursor: pointer; margin-bottom: 2px; }
+/* 会话行照定稿图的 `.srow`：一行 32px、8px 圆角、padding 0 8、槽 16×20 放 6px 状态点、
+   标题 14/20 省略、右侧读数值 12px caption。原来那两行（标题 + 状态行）合不成一行是因为
+   状态标签占了一整行，标签现在进 row 的 title 悬浮。 */
+.us__row {
+  display: flex; align-items: center; gap: 4px; height: var(--scale-session-row); padding: 0 8px;
+  border-radius: 8px; cursor: pointer; margin-bottom: 2px;
+}
 .us__row:hover { background: var(--bg-hover); }
-.us__row--sel { background: var(--ds-100); }
-.us__title { font-size: 13px; font-weight: 600; color: var(--label-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.us__meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--label-tertiary); margin-top: 2px; }
+.us__row--sel { background: var(--bg-selected); }
+.us__slot {
+  flex: none; width: 16px; height: 20px; display: inline-flex;
+  align-items: center; justify-content: center;
+}
+.us__title {
+  flex: 1; min-width: 0; font-size: 14px; font-weight: 400; line-height: 20px;
+  color: var(--label-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .us__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--nb-400); }
 .us__dot--running { background: var(--accent); }
 .us__dot--completed { background: var(--ok); }
 .us__dot--failed, .us__dot--interrupted { background: var(--danger); }
-.us__badge { color: var(--warn); }
-.us__branch { font-family: var(--font-code); color: var(--label-caption); }
+.us__badge {
+  flex: none; font-size: 11px; line-height: 16px; color: var(--warn);
+  border-radius: 999px; padding: 0 6px; white-space: nowrap;
+}
+/* Branch names are unbounded; without a cap a long worktree branch pushes the badge off the row. */
+.us__branch {
+  flex: none; max-width: 74px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-code); font-size: 11px; color: var(--label-caption);
+}
 .us__search {
   margin: 0 12px 8px; padding: 6px 9px; font: inherit; font-size: 12px;
   border: 1px solid var(--border-l2); border-radius: 7px; background: var(--bg-base); color: var(--label-primary);
@@ -27,12 +52,50 @@
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .us__rename {
-  margin-left: auto; border: none; background: none; color: var(--label-caption);
+  flex: none; margin-left: 0; border: none; background: none; color: var(--label-caption);
   cursor: pointer; font-size: 11px; padding: 0 2px; opacity: 0;
 }
 .us__row:hover .us__rename { opacity: 1; }
-/* The archive button was the old margin-left:auto target; with rename present the
-   first of the two owns the push. */
-.us__meta .us__rename ~ .us__archive { margin-left: 2px; }
+/* With the status label off the line, the hover buttons sit at the row's right edge; the second
+   one keeps a 2px gap instead of the old margin-left:auto push, which the flex title now provides. */
+.us__row .us__rename ~ .us__archive { margin-left: 2px; }
+.us__archive {
+  flex: none; border: none; background: none; color: var(--label-caption); cursor: pointer;
+  font-size: 11px; padding: 0 2px; opacity: 0;
+}
 .us__row:hover .us__archive { opacity: 1; }
 .us__empty { padding: 12px; font-size: 12px; color: var(--label-caption); }
+
+/* ② 项目行 — geometry transcribed from the approved mockup's `.prow` (34px row / 8px radius /
+   8px gap / 20x20 mark with 6px radius / 14px name / 11px count pill on --nb-100, r999, 1px 7px).
+   The drawing has no collapse affordance on a project, so the caret is the one element here
+   that is ours rather than the mockup's. */
+.us__group { margin-bottom: 2px; }
+.us__proj {
+  display: flex; align-items: center; gap: 8px; width: 100%; height: var(--scale-project-row); padding: 0 8px;
+  border: none; border-radius: 8px; background: none; cursor: pointer; text-align: left;
+  font: inherit; color: var(--label-primary);
+}
+.us__proj:hover { background: var(--bg-hover); }
+.us__proj-mark {
+  flex: none; width: var(--scale-project-mark); height: var(--scale-project-mark); border-radius: 6px; background: var(--ds-500); color: var(--on-accent);
+  font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center;
+}
+.us__proj-name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 14px; line-height: 20px;
+}
+.us__proj-count {
+  flex: none; font-size: 11px; line-height: 16px; color: var(--label-secondary);
+  background: var(--bg-inline-code); border-radius: 999px; padding: 1px 7px;
+}
+.us__proj-caret {
+  flex: none; width: 0; height: 0; margin-left: 2px;
+  border-left: 4px solid transparent; border-right: 4px solid transparent;
+  border-top: 5px solid var(--label-caption);
+}
+.us__proj--collapsed .us__proj-caret { transform: rotate(-90deg); }
+/* Rows sit one indent step under their project so the two levels read as levels. With the slot in
+   the line the arithmetic has to include it: list 8 + row 8 + slot 16 + gap 4 = 36 for the row text
+   against 8 + 8 + mark 20 + gap 8 = 44 for the project name, i.e. the drawing's -8 relationship. */
+.us__group .us__row { padding-left: 8px; }

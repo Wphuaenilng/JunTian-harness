@@ -11,11 +11,11 @@ import { readFileSync, existsSync, rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { SidecarClient, SessionModel, openSessionStream } from '../packages/client-core/src/index.ts'
+import { openInstance } from './lib-instance.ts'
 
 const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = resolve(clientRoot, '..')
-const info = JSON.parse(readFileSync(join(clientRoot, '.sidecar-info.json'), 'utf8')) as { baseUrl: string; token: string }
-const api = new SidecarClient({ baseUrl: info.baseUrl, token: info.token })
+const { api, info } = openInstance('M1 审批三态（允许一次／始终允许／拒绝）+ busy 队列', { spends: true })
 
 const health = await api.health()
 if (!health.configured) { console.error('✗ provider not configured'); process.exit(1) }

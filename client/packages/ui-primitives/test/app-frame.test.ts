@@ -97,9 +97,9 @@ test('outbound envelope echoes the namespace the frame listens for', () => {
 
 test('the bridge is injected ahead of the document’s own scripts', () => {
   // Marker word chosen so it cannot accidentally match inside a tag name or doctype.
-  const before = (doc: string): number => {
+  const before = (doc: string): [number, number] => {
     const out = injectBridge(doc, NONCE)
-    return [out.indexOf('__tianshu__'), out.indexOf('MARK')] as number[]
+    return [out.indexOf('__tianshu__'), out.indexOf('MARK')]
   }
 
   const withHead = '<!doctype html><html><head><title>t</title></head><body><script>MARK()</script></body></html>'

@@ -42,6 +42,7 @@ import type {
   TaskListPage,
 } from './schedule-types.ts'
 import type { TaskFilterRequest } from './task-types.ts'
+import { selectTasks } from './task-view.ts'
 import type { CockpitSnapshot } from './cockpit-types.ts'
 
 function gitScopeQuery(scope: GitScope): string {
@@ -49,7 +50,6 @@ function gitScopeQuery(scope: GitScope): string {
     ? `cwd=${encodeURIComponent(scope.cwd)}`
     : `sessionId=${encodeURIComponent(scope.sessionId)}`
 }
-import { categorize, type EventCategory } from './event-category.ts'
 
 export interface SidecarEndpoints {
   baseUrl: string
@@ -69,15 +69,24 @@ export interface HealthBody {
   storeLockHolder?: { pid?: number; hostname?: string }
 }
 
-export interface EventPage {
+/**
+ * GET /sessions/:id/events?since= — the hot path. `src/server/session-manager.ts` 的
+ * `getEventsAsync` 只回 `{ events, lastSeq }`：**没有** `firstSeq`，所以这条读数无法告诉你磁盘头
+ * 在哪（2026-10-13 在无 key 实例上实测，见 scripts/accept-history.ts 的 ⑩b 常驻判据）。
+ */
+export interface EventWindow {
   events: SessionEvent[]
-  firstSeq: number
   lastSeq: number
 }
 
-/** Category the UI subscribes by, attached once at the protocol boundary. */
-export interface CategorizedEvent extends SessionEvent {
-  category: EventCategory
+/**
+ * GET /sessions/:id/events?before= — the cold path, and the only one that reports the disk head:
+ * `firstSeq` 是磁盘日志里最早的 seq，`events[0].seq === firstSeq` 就是"没有更早的页了"的信号。
+ * 类型分成两份的理由：把它们合成一个 `firstSeq: number` 的 `EventPage` 会让热通道那条谎写进类型里
+ * （`exactOptionalPropertyTypes` 下 `page.firstSeq === 1` 照样编译通过，运行时永远是 false）。
+ */
+export interface ColdEventPage extends EventWindow {
+  firstSeq: number
 }
 
 /** GET /sessions/search item — snippet is the matched body excerpt, title is display-only. */
@@ -85,6 +94,17 @@ export interface SessionSearchHit {
   sessionId: string
   title: string
   snippet: string
+}
+
+/** Shortest query the sidecar accepts. `check:docs` compares this against the kernel's own guard. */
+export const SEARCH_MIN_QUERY = 2
+
+export interface SessionSearchPage {
+  hits: SessionSearchHit[]
+  /** Transcripts the kernel actually read; null when the query never went out. */
+  scannedFiles: number | null
+  /** True when the query is shorter than the sidecar accepts — no request was made. */
+  tooShort: boolean
 }
 
 export class SidecarError extends Error {
@@ -182,12 +202,27 @@ export class SidecarClient {
    * its messages, and the response carries `meta.scannedFiles`. So the UI must not
    * present this as a title filter, and an empty result means "no body matched".
    */
-  async searchSessions(q: string, limit = 30): Promise<SessionSearchHit[]> {
+  /**
+   * Full-text search over the sidecar's own session transcripts — `~/.rivet/sessions/<项目>/<id>.jsonl`,
+   * one file per session, read for every session the registry lists.
+   *
+   * The 2-character floor is measured, not guessed: a shorter query is answered with
+   * `HTTP 400 {"error":"Query \"q\" must be at least 2 characters"}` (kernel
+   * `session-routes.ts:870`), which used to reach the user as a 搜索失败 banner after a single
+   * keystroke. We refuse locally and let the UI say why.
+   *
+   * `scannedFiles` comes back with the results because "no matches after reading 1 transcript" is a
+   * different statement from "no matches after reading 130" — a session that never ran has no
+   * transcript to read, and the empty state should not pretend the search covered it.
+   */
+  async searchSessions(q: string): Promise<SessionSearchPage> {
+    const trimmed = q.trim()
+    if (trimmed.length < SEARCH_MIN_QUERY) return { hits: [], scannedFiles: null, tooShort: true }
     const body = await this.request<{
       results: SessionSearchHit[]
       meta?: { durationMs: number; scannedFiles: number }
-    }>('GET', `/sessions/search?q=${encodeURIComponent(q)}&limit=${limit}`)
-    return body.results
+    }>('GET', `/sessions/search?q=${encodeURIComponent(trimmed)}`)
+    return { hits: body.results, scannedFiles: body.meta?.scannedFiles ?? null, tooShort: false }
   }
 
   /** Hot path. 409 = the session is running; caller should /queue instead. */
@@ -201,6 +236,18 @@ export class SidecarClient {
       v === 'conflict' ? ('idle' as const) : (v as { laneId: string }))
   }
 
+  /**
+   * The plan's 「busy 走 `/queue`（输入不丢）」 (§6 M1) as one call. Neither endpoint keeps the text
+   * when it refuses: `/prompt` answers 409 busy, and `/queue` answers 409 `code:'idle'` if the run
+   * closed in between (`src/server/session-routes.ts:1204`，`code: 'idle'` 那一支) — so a single hand-off can drop the
+   * input on the floor. Ping-pong once: prompt ⇒ queue ⇒ prompt again.
+   */
+  async sendOrQueue(id: string, text: string): Promise<'ok' | 'queued' | 'lost'> {
+    if ((await this.prompt(id, { prompt: text })) === 'ok') return 'ok'
+    if ((await this.queue(id, text)) !== 'idle') return 'queued'
+    return (await this.prompt(id, { prompt: text })) === 'ok' ? 'ok' : 'lost'
+  }
+
   retractQueued(id: string, laneId: string): Promise<boolean> {
     return this.postJson(`/sessions/${encodeURIComponent(id)}/queue/retract`, { laneId }, 404, 409)
       .then((v) => v !== 'conflict')
@@ -211,11 +258,12 @@ export class SidecarClient {
   }
 
   /** Cold channel: pages older than the in-memory ring (plan M2, triggered by replay_window). */
-  historyPage(id: string, before: number, limit = 200): Promise<EventPage> {
+  historyPage(id: string, before: number, limit = 200): Promise<ColdEventPage> {
     return this.request('GET', `/sessions/${encodeURIComponent(id)}/events?before=${before}&limit=${limit}`)
   }
 
-  events(id: string, since = 0): Promise<EventPage> {
+  /** Hot path (`?since=`) — reads the in-memory ring/loaded log; carries no disk-head field. */
+  events(id: string, since = 0): Promise<EventWindow> {
     return this.request('GET', `/sessions/${encodeURIComponent(id)}/events?since=${since}`)
   }
 
@@ -458,9 +506,14 @@ export class SidecarClient {
 
   /**
    * Background jobs (bash run_in_background and scheduled runs). The filter travels as a
-   * **query string**: `fetch` rejects a GET that carries a body, and the router surfaces
-   * query params to handlers (`src/server/index.ts:80-86`), which is what
-   * `task-routes.ts:197-200` then reads. Putting them in a body would throw client-side.
+   * **query string** (`fetch` rejects a GET that carries a body) — but the sidecar does not read
+   * it over HTTP: `GET /tasks` takes the filter from its first parameter (`body`, empty for a
+   * GET) and names the parameter the router fills with the query `_params`
+   * (`src/server/task-routes.ts:194-200`, `src/server/index.ts:83-92`). Measured on a live
+   * instance in `scripts/accept-tasks.ts`: `?status=…` and `?limit=1` both answer with the whole
+   * table. So the page is narrowed here as well, by `selectTasks()` mirroring the kernel's own
+   * semantics — the query string stays on the wire so this turns into a no-op the day the
+   * server honours it (and `check:layers` says so).
    */
   listTasks(filter: TaskFilterRequest = { limit: 50 }): Promise<TaskListPage> {
     const qs = new URLSearchParams()
@@ -469,7 +522,11 @@ export class SidecarClient {
     if (filter.scheduledTaskId) qs.set('scheduledTaskId', filter.scheduledTaskId)
     if (filter.limit) qs.set('limit', String(filter.limit))
     const q = qs.toString()
-    return this.request('GET', `/tasks${q ? `?${q}` : ''}`)
+    return this.request<TaskListPage>('GET', `/tasks${q ? `?${q}` : ''}`)
+      .then((page) => {
+        const tasks = selectTasks(page.tasks, filter)
+        return { tasks, count: tasks.length }
+      })
   }
 
   /**
@@ -480,14 +537,6 @@ export class SidecarClient {
    */
   cockpit(id: string): Promise<CockpitSnapshot> {
     return this.request('GET', `/sessions/${encodeURIComponent(id)}/cockpit`)
-  }
-
-  /**
-   * Envelope every UI-facing event with its category. This is the boundary the plan
-   * asks for (§4.3 #5): above it there are only 5 kinds of thing, never 56.
-   */
-  categorize(ev: SessionEvent): CategorizedEvent {
-    return { ...ev, category: categorize(ev.type) }
   }
 
   private async postJson(path: string, body: unknown, ...conflictStatuses: number[]): Promise<unknown | 'conflict'> {

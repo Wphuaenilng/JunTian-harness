@@ -14,7 +14,7 @@ touches raw event types. The mapping it depends on:
 | `text_delta` | markdown block (open tail re-parses only) |
 | `thinking_delta` | collapsed `<details>` |
 | `tool_use` + `tool_result` | one tool card, paired by call id |
-| `error` | error block (+ `guidance` from protocol.ts:125) |
+| `error` | error block (+ `guidance` from src/server/protocol.ts:125) |
 | `turn_complete` | divider when `stopReason:'max_tokens'` (the model emits the fact, this package supplies the wording) |
 
 **Endpoints**: `GET /sessions/:id/git/file-base?path=` — and only for the lazy
@@ -81,5 +81,5 @@ escapes the session cwd; treating that as an empty file would be a lie).
 | 端点 | `GET /sessions/:id/git/file-base` |
 | 事件类（wire 名） | `context_budget`、`domain_usage`、`done`、`error`、`goal_state`、`hook_result`、`landing`、`phase`、`queue_pending`、`queue_status`、`status`、`user` |
 | 折叠块类型 | `error`、`text`、`thinking`、`tool`、`turn`、`user` |
-| 宿主回调 props | `onLoadEarlier` |
+| 宿主回调 props | `onLoadEarlier`、`onRetract` |
 <!-- protocol-ledger:end -->

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useT, type LocaleKey } from '@tianshu/locale'
-import type { SidecarClient, DirEntry } from '@tianshu/client-core'
+import { createLatestGate, type SidecarClient, type DirEntry } from '@tianshu/client-core'
 import { ToolOutputBlock } from '@tianshu/ui-primitives'
 
 export interface FileBrowserProps {
@@ -39,39 +39,53 @@ export function FileBrowser({ api, sessionId, onPick }: FileBrowserProps) {
   // is a lie users act on, so the in-flight state is rendered distinctly.
   const [searching, setSearching] = useState(false)
 
+  // 三个各自独立的状态槽，所以三把令牌门：一门只决定"它那一槽谁能写"。合并成一两会互相作废——
+  // 打开文件的那一发会把目录列表的落地判成过期，目录就不刷新了。
+  const dirGate = useMemo(() => createLatestGate(), [])
+  const searchGate = useMemo(() => createLatestGate(), [])
+  const previewGate = useMemo(() => createLatestGate(), [])
+
   // Unquoted search lists the session's directory tree; a query switches to ranked
   // file candidates. Both are the same endpoint with different shapes, so keep the
   // modes explicit rather than guessing from the response length.
   const loadDir = useCallback(() => {
     if (!sessionId) return
+    const token = dirGate.begin()
     void api.listDir(sessionId, path)
-      .then((d) => { setCwd(d.entries); setError(null) })
-      .catch((e: Error) => setError({ key: 'files.listFailed', message: e.message }))
-  }, [api, path, sessionId])
+      .then((d) => { if (!dirGate.isCurrent(token)) return; setCwd(d.entries); setError(null) })
+      .catch((e: Error) => { if (!dirGate.isCurrent(token)) return; setError({ key: 'files.listFailed', message: e.message }) })
+  }, [api, path, sessionId, dirGate])
 
   useEffect(loadDir, [loadDir])
 
   useEffect(() => {
-    if (!sessionId || !query.trim()) { setHits([]); setSearching(false); return }
+    if (!sessionId || !query.trim()) { searchGate.invalidate(); setHits([]); setSearching(false); return }
     setSearching(true)
+    const token = searchGate.begin()
+    // The debounce only stops requests that never left. One already in flight for a query the user
+    // abandoned still lands, and used to write candidates back for text that is no longer in the box.
     const timer = setTimeout(() => {
       void api.listFiles(sessionId, query.trim())
-        .then((f) => { setHits(f); setSearching(false) })
-        .catch((e: Error) => { setError({ key: 'files.searchFailed', message: e.message }); setSearching(false) })
+        .then((f) => { if (!searchGate.isCurrent(token)) return; setHits(f); setSearching(false) })
+        .catch((e: Error) => { if (!searchGate.isCurrent(token)) return; setError({ key: 'files.searchFailed', message: e.message }); setSearching(false) })
     }, 200)
     return () => clearTimeout(timer)
-  }, [api, query, sessionId])
+  }, [api, query, sessionId, searchGate])
 
   const open = useCallback((file: string): void => {
     if (!sessionId) return
+    // 连点两个文件时，先点的那发（大文件、慢）可能后落地——屏上就会显示**没被选中**那个文件的内容。
+    // 预览槽只认最新一发；请求不取消，只是不许写回。
+    const token = previewGate.begin()
     void api.fileContent(sessionId, file)
       .then((f) => {
+        if (!previewGate.isCurrent(token)) return
         setTruncated(f.content.length > PREVIEW_LIMIT)
         setPreview({ path: f.path, content: f.content.slice(0, PREVIEW_LIMIT) })
         setError(null)
       })
-      .catch((e: Error) => setError({ key: 'files.previewFailed', message: e.message }))
-  }, [api, sessionId])
+      .catch((e: Error) => { if (!previewGate.isCurrent(token)) return; setError({ key: 'files.previewFailed', message: e.message }) })
+  }, [api, sessionId, previewGate])
 
   const parentOf = useMemo(() => {
     const parts = path.split('/').filter(Boolean)

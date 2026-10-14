@@ -33,7 +33,7 @@
  * the window hides it, because the sidecar this process owns keeps running (scheduled jobs,
  * an unfinished turn). 退出天枢 in the tray menu — and only that — is a real quit.
  */
-import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron'
+import { app, BrowserWindow, Tray, Menu, nativeImage, nativeTheme } from 'electron'
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
 import { existsSync, readFileSync } from 'node:fs'
@@ -53,6 +53,15 @@ const smokeSeconds = (() => {
 })()
 // verify-desktop.mjs asks the shell to exercise the tray code paths and report on stdout.
 const trayCheck = process.argv.includes('--tray-check')
+/**
+ * `--isolate-home` is a **verification-only** switch: it forwards `launch-sidecar.mjs`'s opt-in
+ * so `RIVET_HOME` (transcripts, cache logs — `src/config/paths.ts:33-35`) lands inside
+ * `apps/desktop/rivet-home` instead of the operator's real `~/.rivet`. The product default is
+ * deliberately unchanged: a real desktop build shares the operator's home, and moving a product's
+ * data root is a decision for the owner, not a convenience for a test. But a verifier has no
+ * business writing into `~/.rivet`, so the three desktop verifiers pass this flag.
+ */
+const isolateHome = process.argv.includes('--isolate-home')
 
 /** The sidecar child is a long-lived daemon; the serve child must die with us. */
 let serveChild = null
@@ -121,6 +130,7 @@ const devConfig = resolve(clientRoot, '.sidecar-data/config.json')
 function bootArgs() {
   const launcher = [resolve(scripts, 'launch-sidecar.mjs'), '--state-dir', stateDir, '--desktop-dir', resolve(stateDir, 'sidecar-data')]
   if (existsSync(devConfig)) launcher.push('--config', devConfig)
+  if (isolateHome) launcher.push('--isolate-home')
   return launcher
 }
 
@@ -136,7 +146,7 @@ async function boot() {
       if (res.ok) {
         console.log('reclaiming sidecar left over from a previous boot')
         await new Promise((res2) => {
-          const stop = run([resolve(scripts, 'launch-sidecar.mjs'), '--state-dir', stateDir, '--stop'])
+          const stop = run([resolve(scripts, 'launch-sidecar.mjs'), '--state-dir', stateDir, '--stop', ...(isolateHome ? ['--isolate-home'] : [])])
           stop.once('exit', () => res2())
           setTimeout(res2, 5_000)
         })
@@ -168,12 +178,23 @@ async function boot() {
 }
 
 function createWindow(url) {
+  // Which theme is painted lives in the page's localStorage and this process cannot read it
+  // (the sandbox talking — the same reason the tray menu follows the OS locale). The window
+  // used to be a hardcoded dark grey, so a light-theme user saw dark first, cancelling
+  // `ui-theme`'s anti-flash work. Following the OS theme is the guess we *can* make.
+  //
+  // A stronger fix was tried and measured false: `show: false` + `ready-to-show` to reveal at
+  // first paint. `ready-to-show` never fired for a hidden window (the fallback had to show it
+  // at 4159ms) and the tray self-test then read `isVisible()===false` — Chromium does not
+  // commit a first frame for a window it is not painting, so waiting on it just hides the app.
+  // Residual flash now happens only when the user forced a theme opposite to the OS.
+  const nativeDark = nativeTheme.shouldUseDarkColors
   const win = new BrowserWindow({
     width: 1268,
     height: 820,
     minWidth: 720,
     minHeight: 480,
-    backgroundColor: '#0F1115',
+    backgroundColor: nativeDark ? '#0F1115' : '#FFFFFF',
     title: '天枢',
     show: true,
     webPreferences: {
@@ -186,6 +207,10 @@ function createWindow(url) {
       spellcheck: false,
     },
   })
+  // Log what the window actually got, not what this file intended to pass: the first version
+  // of this line echoed a locally-computed string and a mutation test proved the
+  // check stayed green while the constructor argument was hardcoded dark.
+  console.log(`WINDOW shown bg=${win.getBackgroundColor()} osDark=${nativeDark}`)
 
   const origin = new URL(url).origin
   win.webContents.on('will-navigate', (e, target) => {
@@ -294,7 +319,7 @@ async function shutdown() {
   if (serveChild && !serveChild.killed) serveChild.kill('SIGTERM')
   // The sidecar is detached on purpose, so it needs its own recorded-pid teardown.
   await new Promise((res) => {
-    const stop = run([resolve(scripts, 'launch-sidecar.mjs'), '--state-dir', stateDir, '--stop'])
+    const stop = run([resolve(scripts, 'launch-sidecar.mjs'), '--state-dir', stateDir, '--stop', ...(isolateHome ? ['--isolate-home'] : [])])
     stop.once('exit', () => res())
     setTimeout(res, 4_000)
   })

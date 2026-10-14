@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Browser app: assembles the ui-* packages over client-core. Same product the Electron shell will host in M3.",
+  "description": "Browser app: assembles the ui-* packages over client-core. The same product the Electron shell hosts (M3 shipped — one bundle, two hosts).",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

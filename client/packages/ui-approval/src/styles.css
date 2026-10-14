@@ -3,7 +3,7 @@
   border: 1px solid var(--amber-400); background: var(--amber-100);
   border-radius: 11px; padding: 11px 12px;
 }
-.ua__card--stalled { border-color: var(--danger); background: #FDECEC; }
+.ua__card--stalled { border-color: var(--danger); background: var(--danger-soft); }
 .ua__title { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--label-primary); display: flex; gap: 8px; align-items: baseline; }
 .ua__grant { font-family: var(--font-code); font-size: 11px; color: var(--label-secondary); font-weight: 400; }
 .ua__input {
@@ -18,5 +18,5 @@
   font: inherit; font-size: 12.5px; padding: 6px 11px; border-radius: 7px; cursor: pointer;
   border: 1px solid var(--border-l2); background: var(--bg-base); color: var(--label-secondary);
 }
-.ua__btn--primary { background: var(--nb-1000); border-color: var(--nb-1000); color: #fff; }
+.ua__btn--primary { background: var(--nb-1000); border-color: var(--nb-1000); color: var(--on-accent); }
 .ua__btn--deny { color: var(--danger); }

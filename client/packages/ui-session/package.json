@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Session list, create, archive. Subscribes to the lifecycle category only.",
+  "description": "Session list rows: create / open / archive / rename and the search surface — everything arrives as props, the panel subscribes to nothing (plan §4.3 #4, pinned by check:layers).",
   "exports": {
     ".": "./src/index.tsx",
     "./styles.css": "./src/styles.css"

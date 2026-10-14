@@ -72,6 +72,18 @@ sidecar 起来那几秒钟里再点一次图标，事件会落进没有监听器
 「B refused before booting」见红；去掉 `second-instance` 的回执日志 → 只有
 「A was told about it」见红。各恰好一条红、其余全绿，还原后 8/8 复绿。
 
+## 窗口底色与首帧（含一条被证伪的修法）
+
+- 窗口底色不再是写死的 `#0F1115`，而是跟随 OS：`nativeTheme.shouldUseDarkColors ? '#0F1115' : '#FFFFFF'`。
+  主进程读不到渲染层 `localStorage` 里存的主题（沙箱所致，与托盘菜单跟随 OS locale 是同一个理由），
+  所以这只是一个**能做的猜测**；残余闪烁只剩「用户强制了与系统相反的主题」这一种情况。
+- **被实测证伪的更强修法**：`show:false` + 等 `ready-to-show` 再显示。真实结果是
+  `ready-to-show` 4159ms 都没触发（最后是 4 秒兜底把窗口显示出来的），期间 `isVisible()` 读到
+  `false` —— Chromium 不为隐藏窗口提交首帧，等它就等于让应用隐身。别再踩这一条。
+- 判定读的是 `win.getBackgroundColor()`（窗口**实际拿到**的值），不是日志里自己拼出来的字符串：
+  第一版读的是"我声称选了什么"，把构造参数改回写死深色时门一声不响。现在同一个变异会红一条。
+  `scripts/verify-desktop.mjs` 现 14 条（顺带把托盘自检的断言加强成要求 `visible=true`）。
+
 ## daemon 的运行时：electron-as-node 只能给脚本，不能给内核
 
 `run()` 用 `process.execPath` + `ELECTRON_RUN_AS_NODE=1` 起 `launch-sidecar.mjs` 和

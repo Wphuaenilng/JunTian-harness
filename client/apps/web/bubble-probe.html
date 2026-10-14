@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>天枢 · 消息气泡探针</title>
+</head>
+<body>
+  <!-- Developer page, not product surface: it mounts the real <ChatStream> with a user bubble and an
+       assistant paragraph, so a headless browser can measure the bubble's rendered geometry. The main
+       app has no messages without a run (which costs an upstream call), which is why this anchor used
+       to print "页面上没有这个元素". Built as a third vite input; nothing links to it.
+       Measured by `node scripts/check-live-geometry.mjs` (the .ububble anchor + the alignment row).
+       #root stays FIRST in DOM order: the gate reads the first .uc__bubble, and the second root below
+       is the streaming render-face probe (60 sealed blocks + a growing open one) that reports how many
+       BlockView bodies a stream actually re-renders. -->
+  <div id="root"></div>
+  <div id="stream-probe"></div>
+  <div id="stream-result"></div>
+  <script type="module" src="/src/bubble-probe.tsx"></script>
+</body>
+</html>
