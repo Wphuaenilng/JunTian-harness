@@ -16,7 +16,7 @@ jobs:
       pull-requests: read
     strategy:
       matrix:
-        # engines 钉 24.1.0 且 .npmrc engine-strict=true,低于 24 会在 npm ci 直接被拒
+        # 根 engines.node = ">=24"（下限，不是钉版本）且 .npmrc engine-strict=true，低于 24 会在 npm ci 直接被拒
         node-version: [24]
     steps:
       - uses: actions/checkout@v4

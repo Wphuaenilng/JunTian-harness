@@ -5,7 +5,7 @@
 
 ## 项目
 
-全功能终端编程智能体运行时（CLI 命令 `rivet`，别名 `tianshu`）：Node.js 24（engines 钉 24.18.0）+ TypeScript strict + 纯 ANSI 终端 UI（`src/tui/engine/`，零 React/Ink）。桌面端与 VS Code 插件均经 `src/server/` sidecar 驱动同一内核。
+全功能终端编程智能体运行时（CLI 命令 `rivet`，别名 `tianshu`）：Node.js 24（根 `package.json` 的 `engines.node` 是 `">=24"`，`.npmrc` 的 `engine-strict=true` 把这个下限变成硬拒——是**下限**，不是钉版本）+ TypeScript strict + 纯 ANSI 终端 UI（`src/tui/engine/`，零 React/Ink）。桌面端与 VS Code 插件均经 `src/server/` sidecar 驱动同一内核。
 
 ## 构建与测试
 
