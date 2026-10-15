@@ -41,7 +41,7 @@ import type {
   ScheduledTask,
   TaskListPage,
 } from './schedule-types.ts'
-import type { TaskFilterRequest } from './task-types.ts'
+import type { TaskFilterRequest, TaskRecord } from './task-types.ts'
 import { selectTasks } from './task-view.ts'
 import type { CockpitSnapshot } from './cockpit-types.ts'
 
@@ -527,6 +527,24 @@ export class SidecarClient {
         const tasks = selectTasks(page.tasks, filter)
         return { tasks, count: tasks.length }
       })
+  }
+
+  /** 一次读回单条运行（`{task}`）。看板只有列表形状，取消之后要能读到它的新状态。 */
+  getTask(id: string): Promise<TaskRecord> {
+    return this.request<{ task: TaskRecord }>('GET', `/tasks/${encodeURIComponent(id)}`).then((b) => b.task)
+  }
+
+  /** 取消认的是 **job id**（`registry.cancel(id)`，`src/server/task-routes.ts:218`），回 `{task}`。 */
+  cancelTask(id: string): Promise<TaskRecord> {
+    return this.request<{ task: TaskRecord }>('POST', `/tasks/${encodeURIComponent(id)}/cancel`, {}).then((b) => b.task)
+  }
+
+  /**
+   * 手动试跑认的是**调度定义 id，不是 job id**（`scheduler.runNow(params.id)`，
+   * `src/server/schedule-routes.ts:223`）——所以这颗钮属于定义行，不属于运行列表。
+   */
+  runNowSchedule(id: string): Promise<{ id: string; triggered: boolean }> {
+    return this.request<{ id: string; triggered: boolean }>('POST', `/schedule/${encodeURIComponent(id)}/run-now`, {})
   }
 
   /**

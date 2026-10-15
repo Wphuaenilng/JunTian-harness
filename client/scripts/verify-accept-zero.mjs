@@ -84,6 +84,26 @@ const countTree = (root) => {
 }
 const seedWatch = join(resolve(clientRoot, '..'), '.rivet')
 const seedBefore = countTree(seedWatch)
+/** 不只数个数：记下每一次比对时的**文件名集合**，这样才能答"是哪一台动的、动了哪一个文件"。 */
+const listTree = (root) => {
+  const out = []
+  const stack = [root]
+  while (stack.length > 0) {
+    const d = stack.pop()
+    let names = []
+    try { names = readdirSync(d) } catch { continue }
+    for (const name of names) {
+      const p = join(d, name)
+      let isDir = false
+      try { isDir = statSync(p).isDirectory() } catch { continue }
+      if (isDir) stack.push(p)
+      else out.push(p.slice(root.length + 1).replace(/\\/g, '/'))
+    }
+  }
+  return out.sort()
+}
+let seedNames = listTree(seedWatch)
+const seedDrift = []
 
 const run = (args, timeout = 180_000) =>
   spawnSync(node, args, { cwd: clientRoot, encoding: 'utf8', timeout, env: process.env })
@@ -112,13 +132,27 @@ try {
       r.status === 0 && green > 0 && red.length === 0 && dialedThisBoot && saidIt,
       `exit=${String(r.status)} ✓=${green} ✗=${red.length} 登记来源=${infoLine || '（子进程没打印 info file）'}${dialedThisBoot ? '' : ' ≠ 本次临时目录'}${saidIt ? '' : `；它没说出「${mustSay}」这句话——那一半没量到`}`)
     for (const line of red.slice(0, 4)) console.log(`    ${line.trim().slice(0, 170)}`)
+    const nowNames = listTree(seedWatch)
+    const gone = seedNames.filter((x) => !nowNames.includes(x))
+    const fresh = nowNames.filter((x) => !seedNames.includes(x))
+    if (gone.length + fresh.length > 0) {
+      seedDrift.push(`${file} 这台上：${gone.length > 0 ? `删了 ${gone.join(', ')}` : ''}${gone.length > 0 && fresh.length > 0 ? '；' : ''}${fresh.length > 0 ? `多了 ${fresh.join(', ')}` : ''}`)
+    }
+    seedNames = nowNames
   }
   const seedAfter = countTree(seedWatch)
-  check('验证跑不往操作者的工作树里写（仓根 .rivet/ 的文件数前后相等）', seedAfter === seedBefore,
+  check('验证跑不往操作者的工作树里写（仓根 .rivet/ 的文件集合前后完全相等；不等就点名是哪一台动的、动了哪个文件）',
+    seedAfter === seedBefore && seedDrift.length === 0,
     `开跑前 ${seedBefore} 个文件，跑完 ${seedAfter} 个`
+    + (seedDrift.length === 0 ? '' : `；逐台比对的漂移：${seedDrift.join(' ｜ ')}`)
     + (seedAfter > seedBefore
-      ? `——多出 ${seedAfter - seedBefore} 个：有探针把会话 cwd 设在仓根，而内核会往任何会话 cwd 里种 .rivet/（skills + 它自己的库，accept-panel 判据⑥量的正是这件事）。存储层隔离得再好，工作树照样被写脏。`
-      : seedAfter < seedBefore ? `——少了 ${seedBefore - seedAfter} 个：这一跑删掉了仓根 .rivet/ 里的东西，同样不该发生。` : ''))
+      ? '——多出来说明有探针把会话 cwd 设在仓根，而内核会往任何会话 cwd 里种 .rivet/（skills + 它自己的库，accept-panel 判据⑥量的正是这件事）。存储层隔离得再好，工作树照样被写脏。'
+      : seedAfter < seedBefore
+        ? `——少了说明这一跑删掉了仓根 .rivet/ 里**已有**的东西，比写脏更糟。`
+        + (/\/vsw\/|^vsw\//.test(seedDrift.join(' '))
+          ? '（点名的路径落在 .rivet/vsw/ 下：与内核的死会话 worktree 清扫一致——它的根是 `join(baseCwd, \'.rivet\', \'vsw\')`，而隔离 sidecar 不搬会话库，于是会在操作者的仓根里收别人的 worktree。假设，未用重跑验证。）'
+          : '')
+        : ''))
 } finally {
   if (launched) {
     const stop = run(['scripts/launch-sidecar.mjs', '--state-dir', dir, '--stop'], 60_000)

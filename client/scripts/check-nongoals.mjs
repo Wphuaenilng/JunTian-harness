@@ -661,6 +661,7 @@ const isEvidenceFace = (f) =>
   //   'human' 由人亲自跑的文档型工具：why 里点名的那份文档必须真的提到它（和写面 skip 理由同一形状）
   const EXPECTED_ORPHAN = {
     'accept-agui.ts': { kind: 'live', why: 'AG-UI 的官方 schema / 真 CopilotKit 那一半等你拍板（交接第 9 条）；且它回放的是**已在跑那台实例**的历史事件——fresh 隔离实例上没有事件可回放' },
+    'accept-always-cross.ts': { kind: 'keyed', why: '「始终允许」的**跨进程**那一半：同进程里"允许一次"也免审同一目录，只有换了进程还认才算 remember；两阶段（setup / verify）合起来 4 个 prompt，没 key 时脚本自己 exit 1（#27）' },
     'accept-approval.ts': { kind: 'keyed', why: '审批"始终允许/拒绝"的活验要一次真上游 run（#27）；没 key 时脚本自己 exit 1' },
     'accept-git.ts': { kind: 'live', why: '读真实会话的 git 历史（挂已在跑的实例）；写路径那条由 accept-gitwrite.ts 常驻覆盖' },
     'accept-stream.ts': { kind: 'keyed', why: '流式帧只有一次真 run 才有；脚本自己没 key 就拒' },

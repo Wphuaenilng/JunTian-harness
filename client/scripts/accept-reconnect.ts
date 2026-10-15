@@ -21,7 +21,7 @@
  */
 import { openSessionStream } from '../packages/client-core/src/index.ts'
 import { forEachSseFrame } from '../packages/client-core/src/sse-frames.ts'
-import { openInstance, probeWorkspace } from './lib-instance.ts'
+import { openInstance, probeWorkspace, sendPrompt } from './lib-instance.ts'
 
 const ws = probeWorkspace('reconnect')
 const { api, info } = openInstance('断线 10 秒续读不丢不重（档一无 key 自己造现场与断线期间的事件）')
@@ -75,7 +75,7 @@ if (explicitId !== undefined) {
     String(created.cwd ?? '').replace(/\\/g, '/').toLowerCase().startsWith(ws.cwd.replace(/\\/g, '/').toLowerCase()),
     `落点=${ws.cwd}，会话认的 cwd=${String(created.cwd)}${ws.note === '' ? '' : ` ｜ ${ws.note}`}`)
   console.log('  i 花费声明：这台 configured:false，接下来 2 发 /prompt 由内核本地受理、不会离开本机（实测随后自报 failed 并留下 error 事件）')
-  const acc1 = await api.prompt(sessionId, { prompt: FIRST_PROMPT })
+  const acc1 = await sendPrompt(api, sessionId, FIRST_PROMPT, '第一代：断线前那一发')
   let sawRunning = false
   for (let i = 0; i < 100 && !sawRunning; i++) {
     sawRunning = (await api.getSession(sessionId)).status === 'running'
@@ -125,7 +125,7 @@ if (manufactured) {
     if ((await api.getSession(sessionId)).status !== 'running') break
     await sleep(100)
   }
-  const acc2 = await api.prompt(sessionId, { prompt: GAP_PROMPT })
+  const acc2 = await sendPrompt(api, sessionId, GAP_PROMPT, '断线期间落下的那一发')
   for (let i = 0; i < 200; i++) {
     if ((await api.getSession(sessionId)).status !== 'running') break
     await sleep(100)

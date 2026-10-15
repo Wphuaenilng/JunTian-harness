@@ -23,7 +23,7 @@
  *   node scripts/accept-history.ts --info=<隔离实例的 .sidecar-info.json>   # 档一：无 key，当场造
  */
 import { SessionModel, type SessionEvent } from '../packages/client-core/src/index.ts'
-import { openInstance, probeWorkspace } from './lib-instance.ts'
+import { openInstance, probeWorkspace, sendPrompt } from './lib-instance.ts'
 
 const ws = probeWorkspace('history')
 const { api, info } = openInstance('M2 历史向上分页：冷通道 before= 逐页回填到磁盘头')
@@ -87,7 +87,7 @@ if (explicitId !== undefined) {
   const turns: { acc: string; final: string; ms: number; sawRunning: boolean }[] = []
   for (const text of PROMPTS) {
     const t0 = Date.now()
-    const acc = await api.prompt(sessionId, { prompt: text })
+    const acc = await sendPrompt(api, sessionId, text, '冷通道分页要造的现场')
     let status = ''
     let sawRunning = false
     for (let i = 0; i < 600; i++) {

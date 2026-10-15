@@ -14,7 +14,7 @@
  *
  *   node scripts/accept-queue.ts --info=<隔离实例的 .sidecar-info.json>
  */
-import { openInstance, probeWorkspace } from './lib-instance.ts'
+import { openInstance, probeWorkspace, rawPromptPost, sendOrQueueGuarded, sendPrompt, sendQueue } from './lib-instance.ts'
 
 const { api, info } = openInstance('排队交接的线上契约：空闲时的 /queue 到底回什么')
 
@@ -40,7 +40,7 @@ check('探针会话的 cwd 就在本次的临时落点里（内核会往**任何
   `落点=${ws.cwd}，会话认的 cwd=${String(session.cwd)}${ws.note === '' ? '' : ` ｜ ${ws.note}`}`)
 
 // 1) 客户端的映射：空闲 ⇒ 联合类型里的 'idle'——`sendOrQueue` 的回退就认这个值。
-const queued = await api.queue(session.id, '探针文字（不会起 run）')
+const queued = await sendQueue(api, session.id, '探针文字（不会起 run）', '空闲会话上的 /queue 应被拒')
 check('SidecarClient.queue 在空闲会话上映射成 "idle"', queued === 'idle', `实得 ${JSON.stringify(queued)}`)
 
 // 2) 内核自己怎么说的（绕过客户端直读），证明上面那个映射是运行时的，不是我编的。
@@ -67,7 +67,7 @@ check('retractQueued 遇到不存在的 lane 报 false 而非抛错', retracted 
 const health = await api.health().catch(() => null)
 if (health?.configured === false) {
   console.log('  i 花费声明：这台 configured:false，接下来几发 /prompt 由内核本地受理、不会离开本机（实测随后自报 failed 并留下 error 事件）')
-  const first = await api.prompt(session.id, { prompt: 'accept-queue: 造一条只在机器上活着的 run' })
+  const first = await sendPrompt(api, session.id, 'accept-queue: 造一条只在机器上活着的 run', '造忙第一发')
   let running = false
   for (let i = 0; i < 30 && !running; i++) {
     running = (await api.getSession(session.id)).status === 'running'
@@ -77,25 +77,21 @@ if (health?.configured === false) {
   check('无 key 的 /prompt 被受理后会话真进入 running（这条 run 从未出门）',
     running, `prompt 回 ${first}；health.configured=${String(health.configured)}`)
   if (running) {
-    const second = await api.prompt(session.id, { prompt: 'accept-queue: 忙时补一发' })
+    const second = await sendPrompt(api, session.id, 'accept-queue: 忙时补一发', '忙时补一发')
     check('忙时第二发 /prompt 得到 busy（409 在客户端映射成 busy）', second === 'busy', `实得 ${second}`)
-    const rawBusy = await fetch(`${info.baseUrl}/sessions/${encodeURIComponent(session.id)}/prompt`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${info.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ prompt: 'accept-queue: 绕过客户端再看一眼内核' }),
-    })
-    const rawBusyBody = await rawBusy.json().catch(() => ({})) as { error?: string; code?: string }
+    // 绕过客户端再打一次线上：证明上面那个 busy 是内核说的，不是 SidecarClient 自己映射出来的。
+    const rawBusy = await rawPromptPost(info, session.id, 'accept-queue: 绕过客户端再看一眼内核', '线上控制：直读 409')
     check('内核自己说的确实是 409 / code="busy"（证明上面那个映射不是客户端编的）',
-      rawBusy.status === 409 && rawBusyBody.code === 'busy', `status=${rawBusy.status} body=${JSON.stringify(rawBusyBody)}`)
-    const lane = await api.queue(session.id, '忙时的排队文字（输入不丢）')
-    check('忙时 /queue 不再报 idle，而是给出 laneId', lane !== 'idle' && typeof lane.laneId === 'string' && lane.laneId.length > 0,
+      rawBusy.status === 409 && rawBusy.code === 'busy', `status=${rawBusy.status} code=${rawBusy.code}${rawBusy.refused ? '（这台有 key，这一发没打）' : ''}`)
+    const lane = await sendQueue(api, session.id, '忙时的排队文字（输入不丢）', '忙时排队第一条')
+    check('忙时 /queue 不再报 idle，而是给出 laneId', lane !== 'idle' && lane !== 'not-sent' && typeof lane.laneId === 'string' && lane.laneId.length > 0,
       JSON.stringify(lane))
     // 排进去的那条能不能撤：这一格此前写在台账里是"要 busy 才测得了，属付费那一格"——现在忙时能自己造，
     // 就顺手量掉（`retractQueued` 对不存在的 lane 上面已量过 false，这一条量真的是 true 的那一半）。
     // 排两条、撤第一条：这一格台账原先记成"要 busy 才测得了，属付费那一格"——忙时既然能自己造，就一并量掉。
     // 没有列 lane 的读端点，所以用"撤了的再撤一次必 false、没撤过的那条仍 true"来证明两条 lane 互不相干。
-    if (lane !== 'idle') {
-      const first2 = await api.queue(session.id, '忙时排队的第二条')
+    if (lane !== 'idle' && lane !== 'not-sent') {
+      const first2 = await sendQueue(api, session.id, '忙时排队的第二条', '忙时排队第二条')
       const lane2 = typeof (first2 as { laneId?: string }).laneId === 'string' ? (first2 as { laneId: string }).laneId : ''
       check('忙时能连续排进两条（第二条也拿到自己的 laneId）', lane2.length > 0 && lane2 !== lane.laneId, `${lane.laneId} vs ${lane2 || JSON.stringify(first2)}`)
       const back = await api.retractQueued(session.id, lane.laneId)
@@ -112,8 +108,8 @@ if (health?.configured === false) {
     const tried: string[] = []
     let handoff = ''
     for (let attempt = 0; attempt < 4 && handoff !== 'queued'; attempt++) {
-      const armed = await api.prompt(session.id, { prompt: `accept-queue: 第 ${attempt + 1} 次造忙（一发只在机器上活着的 run）` })
-      handoff = String(await api.sendOrQueue(session.id, 'accept-queue: 整趟交接走一遍'))
+      const armed = await sendPrompt(api, session.id, `accept-queue: 第 ${attempt + 1} 次造忙（一发只在机器上活着的 run）`, `第 ${attempt + 1} 次造忙`)
+      handoff = String(await sendOrQueueGuarded(api, session.id, 'accept-queue: 整趟交接走一遍', 'sendOrQueue 整趟交接'))
       tried.push(`第 ${attempt + 1} 次：prompt=${armed} → sendOrQueue=${handoff}`)
     }
     check('sendOrQueue 在忙时落进 "queued"（§6 M1 那句「busy 走 /queue（输入不丢）」的线上形状）',

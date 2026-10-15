@@ -1239,6 +1239,37 @@ const codeHomes = (needle) => scriptFiles
           : `包内类名 ${pkg.size} 枚 ／ 宿主类名 ${host.size} 枚 ／ 交集 0 处`)
 }
 
+// -------------------------------------------------- 组：脚本自身的可解析性
+// 为什么要有这一组：`corepack pnpm typecheck` 的面覆盖 .ts（含测试与验收脚本），但 **`.mjs` 不在里面**——
+// 2026-10-15 实测过：一份括号写坏的 `verify-accept-zero.mjs` 让 `node --check` exit 1，而同一棵树的 typecheck 是 0。
+// 也就是说这类错能完全绕过类型面，只有真跑到那个脚本才会炸。所以把它变成常驻判定，并配一条坏样本反例。
+{
+  const { spawnSync: spawnMjs } = await import('node:child_process')
+  const { writeFileSync: writeMjs, mkdtempSync: mkTmp } = await import('node:fs')
+  const { tmpdir: osTmp } = await import('node:os')
+  const mjsFiles = []
+  const collectMjs = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, e.name)
+      if (e.isDirectory()) collectMjs(p)
+      else if (e.name.endsWith('.mjs')) mjsFiles.push(p)
+    }
+  }
+  collectMjs(join(clientRoot, 'scripts'))
+  const syntaxBad = mjsFiles.filter((f) => spawnMjs(process.execPath, ['--check', f], { encoding: 'utf8' }).status !== 0)
+  const canaryDir = mkTmp(join(osTmp(), 'layers-mjs-canary-'))
+  const canaryFile = join(canaryDir, 'broken.mjs')
+  writeMjs(canaryFile, 'const a = (1;\n')
+  const canaryStatus = spawnMjs(process.execPath, ['--check', canaryFile], { encoding: 'utf8' }).status
+  const rmMjs = await import('node:fs').then((m) => m.rmSync)
+  rmMjs(canaryDir, { recursive: true, force: true })
+  record('脚本可解析性', `scripts/ 下全部 ${mjsFiles.length} 份 .mjs 都过 node --check（.mjs 不在 typecheck 面里，这类错只能由这条挡）`,
+    mjsFiles.length >= 18 && syntaxBad.length === 0 && canaryStatus !== 0,
+    syntaxBad.length > 0 ? `语法不过：${syntaxBad.map((f) => f.slice(clientRoot.length + 1)).join(' , ')}`
+      : canaryStatus === 0 ? '反例夹具没挡住（node --check 对坏样本给了 0）——上一条不作数，它是空操作'
+        : `现扫 ${mjsFiles.length} 份全过；反例：一份括号写坏的 .mjs 被挡在 exit=${canaryStatus}`)
+}
+
 // ---------------------------------------------------------------- report
 const fails = results.filter((r) => !r.ok)
 if (!quiet) {

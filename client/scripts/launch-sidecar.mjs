@@ -194,13 +194,22 @@ async function main() {
   const runtime = daemonRuntime()
   delete env.ELECTRON_RUN_AS_NODE
   console.log(`daemon: ${runtime.bin} (${runtime.version}, ${runtime.why})`)
+  // The daemon's process cwd is what the kernel resolves a session's project root from whenever the
+  // caller didn't give that session an explicit cwd — and `<project root>/.rivet/` is exactly where
+  // `src/agent/memory-epoch.ts`'s LEGACY_FILES cleanup deletes files. Spawning every isolated run
+  // with cwd=repoRoot let one acceptance pass erase `<repoRoot>/.rivet/knowledge/advisory-efficacy.jsonl`
+  // (2026-10-15, caught by verify-accept-zero's containment guard, which now names machine + file).
+  // `--state-dir` already means "this run's bookkeeping lives in this temp root"; the daemon's own
+  // cwd belongs in that same root. Without the flag nothing changes — the operator's flow keeps repoRoot.
+  const daemonCwd = opts.stateDir ? resolve(opts.stateDir) : repoRoot
+  console.log(`daemon cwd: ${daemonCwd}`)
   // `--state-dir` 搬的是这两个记账文件；desktopDir 与 RIVET_HOME 上面都已 recursive 建过，唯独这个
   // 目录此前隐含"caller 已经建好"——传一个尚不存在的 --state-dir 就会在 openSync 处 ENOENT
   //（2026-10-12 实测：诊断时手起一台就是这么死的）。放在 stop 分支之后，所以 `--stop` 不会建目录。
   mkdirSync(dirname(logPath), { recursive: true })
   const logFd = openSync(logPath, 'w')
   const child = spawn(runtime.bin, [entry, 'serve', '--port', String(port)], {
-    cwd: repoRoot,
+    cwd: daemonCwd,
     env,
     stdio: ['ignore', logFd, logFd],
     shell: false,

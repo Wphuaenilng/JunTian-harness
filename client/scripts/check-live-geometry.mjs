@@ -1646,6 +1646,16 @@ try {
 
   // 「后台运行」那一节的真数据渲染。以前这一格只有代码与类型层的保证（台账记在 M2 看板那行），
   // 现在拿上面造出来的两条真记录在同一个浏览器里量：DOM 里到底落了什么，只有浏览器说得出。
+  // 三颗钮的名字从 locale 取，不在这里硬编码中文串：面板换了措辞，锚点该跟着读不到（红），
+  // 而不是拿一份抄自 zh.ts 的常量在页面上永远匹配不到。
+  const LBL = (() => {
+    const src = readFileSync(join(clientRoot, 'packages', 'locale', 'src', 'zh.ts'), 'utf8')
+    const pick = (k) => {
+      const m = new RegExp(`'schedule\\.${k}':\\s*'([^']+)'`).exec(src)
+      return m ? m[1] : ''
+    }
+    return { detail: pick('detail'), cancel: pick('cancel'), runNow: pick('runNow') }
+  })()
   const JPROBE = `() => {
     const sec = document.querySelector('.sc__jobs')
     if (!sec) return JSON.stringify({ present: false })
@@ -1669,8 +1679,11 @@ try {
         prompt: prompt ? prompt.textContent.trim() : '',
         meta: meta ? meta.textContent.replace(/\\s+/g, ' ').trim() : '',
         h: Math.round(li.getBoundingClientRect().height),
+        btns: Array.from(li.querySelectorAll('.sc__actions button')).map((b) => b.textContent.trim()),
       }
     })
+    const defList = Array.from(document.querySelectorAll('ul.sc__list')).find((ul) => !ul.closest('.sc__jobs'))
+    const defRows = defList ? Array.from(defList.querySelectorAll('.sc__item')) : []
     const head = document.querySelector('.sc__jobhead')
     return JSON.stringify({
       present: true,
@@ -1678,9 +1691,11 @@ try {
       over,
       head: head ? head.textContent.trim() : '',
       railW: Math.round((document.querySelector('.sc') || sec).getBoundingClientRect().width),
+      defs: defRows.map((li) => Array.from(li.querySelectorAll('.sc__actions button')).map((b) => b.textContent.trim())),
     })
   }`
-  let jobs = { present: false, rows: [], over: [], head: '', railW: 0 }
+  let jobs = { present: false, rows: [], over: [], head: '', railW: 0, defs: [] }
+  let expanded = { clicked: false, present: false, text: '' }
   let jobsWhy = ''
   try {
     const jpage = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 2 })
@@ -1692,6 +1707,23 @@ try {
     await jpage.waitForSelector('.sc__jobs', { timeout: 20_000 })
     await sleep(1_200)
     jobs = JSON.parse(await jpage.evaluate(`(${JPROBE})()`))
+    // 点第一行的「详情」，再读那一行里有没有展开出来的读回块——展开态只有浏览器说得出真假。
+    const clicked = JSON.parse(await jpage.evaluate(`(() => {
+      const li = document.querySelector('.sc__jobs .sc__item')
+      if (!li) return JSON.stringify({ ok: false })
+      const b = Array.from(li.querySelectorAll('.sc__actions button'))
+        .find((x) => x.textContent.trim() === ${JSON.stringify(LBL.detail)})
+      if (!b) return JSON.stringify({ ok: false })
+      b.click()
+      return JSON.stringify({ ok: true })
+    })()`))
+    await sleep(2_000)
+    const afterExpand = JSON.parse(await jpage.evaluate(`(() => {
+      const li = document.querySelector('.sc__jobs .sc__item')
+      const d = li ? li.querySelector('.sc__detail') : null
+      return JSON.stringify({ present: !!d, text: d ? d.textContent.replace(/\\s+/g, ' ').trim() : '' })
+    })()`))
+    expanded = { clicked: clicked.ok === true, present: afterExpand.present === true, text: String(afterExpand.text ?? '') }
     await jpage.close()
   } catch (e) {
     jobsWhy = String(e).slice(0, 160)
@@ -1726,6 +1758,37 @@ try {
         got: jobs.present ? `读到 ${jobs.rows.length} 行 · 本节宽 ${jobs.railW}px` : jobsWhy !== '' ? `打开失败：${jobsWhy}` : '页面上没有 .sc__jobs',
         ok: jobs.present === true,
         note: `标题实读「${jobs.head}」；locale 里 schedule.jobsTitle = ${JSON.stringify(localeJobs)}`,
+      })
+      // ↓ #28 选的那一格（C）：取消挂运行行、重跑挂定义行、详情走行内展开。四条各钉一件事。
+      rows.push({
+        name: '运行行每行都有「详情」钮（入口在行上，不是页签）',
+        want: `${jobs.rows.length} 行 × 每行一枚「${LBL.detail}」`,
+        got: jobs.rows.map((r) => `${r.status}:${r.btns.includes(LBL.detail) ? '有' : '无'}`).join(' '),
+        ok: jobs.rows.length >= 2 && jobs.rows.every((r) => r.btns.includes(LBL.detail)),
+        note: `locale 里 schedule.detail = ${JSON.stringify(LBL.detail)}（空串=键没读到，这条会红得有理）`,
+      })
+      rows.push({
+        name: '点「详情」真的展开一次性读回（展开态里读到 status:）',
+        want: '第一行出现 .sc__detail 且含 `status:`',
+        got: expanded.clicked ? (expanded.present ? expanded.text.slice(0, 90) : '点了，但没有 .sc__detail 出现') : '第一行上没有可点的「详情」钮',
+        ok: expanded.clicked === true && expanded.present === true && /status:/.test(expanded.text),
+        note: '读的是浏览器里那一行的 DOM，不是 API 返回值——GET /tasks/:id 真发出去了才会有这块',
+      })
+      rows.push({
+        name: '「取消」只长在非终态运行行上',
+        want: 'running/pending 行有钮，终态行没有',
+        got: jobs.rows.map((r) => `${r.status}=${r.btns.includes(LBL.cancel) ? '有钮' : '无钮'}`).join(' '),
+        ok: jobs.rows.length >= 2 && jobs.rows.every((r) =>
+          (r.status === 'running' || r.status === 'pending') === r.btns.includes(LBL.cancel)),
+        note: `locale 里 schedule.cancel = ${JSON.stringify(LBL.cancel)} · 现场两条的终态是 ${mine.map((m) => m.status).join(',')}`,
+      })
+      rows.push({
+        name: '「立即试跑」在定义行、不在运行行（run-now 的路径参数是定义 id）',
+        want: `每条定义行都有「${LBL.runNow}」，${jobs.rows.length} 条运行行都没有`,
+        got: `定义行 ${jobs.defs.filter((d) => d.includes(LBL.runNow)).length}/${jobs.defs.length} 有钮 · 运行行 ${jobs.rows.filter((r) => r.btns.includes(LBL.runNow)).length} 行有钮`,
+        ok: jobs.defs.length >= 1 && LBL.runNow !== '' && jobs.defs.every((d) => d.includes(LBL.runNow))
+          && jobs.rows.every((r) => !r.btns.includes(LBL.runNow)),
+        note: '挂错行的话点它会拿 job id 去撞 /schedule/:id/run-now（内核按定义 id 查，404 了事）',
       })
       rows.push({
         name: '后台运行 行数 = 这一页该有的条数（min(50, 服务端条数)，不是本轮造了几条）',

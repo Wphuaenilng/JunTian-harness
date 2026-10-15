@@ -43,11 +43,11 @@ path stayed inside the isolated dir, and that no residue is left behind.
 口径说明：这里记的是**本包源码里的直接调用点**。面板常经 props 拿数据和触发动作，那种情况下端点由宿主 `apps/web` 或
 `@tianshu/client-core` 消费，本表如实显示为空——不是缺口。正文里手写的端点表可以描述周边界面，但它不构成台账。
 
-调用点 7 个：`createScheduleTask`、`deleteScheduleTask`、`listScheduledTasks`、`listTasks`、`patchScheduleTask`、`pauseScheduleTask`、`scheduleStatus`
+调用点 10 个：`cancelTask`、`createScheduleTask`、`deleteScheduleTask`、`getTask`、`listScheduledTasks`、`listTasks`、`patchScheduleTask`、`pauseScheduleTask`、`runNowSchedule`、`scheduleStatus`
 
 | 面 | 消费内容 |
 |---|---|
-| 端点 | `DELETE /schedule/:id`、`GET /schedule`、`GET /schedule/status`、`GET /tasks`、`PATCH /schedule/:id`、`POST /schedule`、`POST /schedule/:id/pause` |
+| 端点 | `DELETE /schedule/:id`、`GET /schedule`、`GET /schedule/status`、`GET /tasks`、`GET /tasks/:id`、`PATCH /schedule/:id`、`POST /schedule`、`POST /schedule/:id/pause`、`POST /schedule/:id/run-now`、`POST /tasks/:id/cancel` |
 | 事件类（wire 名） | — |
 | 折叠块类型 | — |
 | 宿主回调 props | — |

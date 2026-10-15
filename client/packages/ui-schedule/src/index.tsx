@@ -59,6 +59,28 @@ export function AutomationBoard({ api, canPatch, defaultCwd }: AutomationBoardPr
   // 是哪一刻"变成随机的。桩不住的那半（jobs 列表）单独一把，因为它与 definitions 是两次独立读。
   const boardGate = useMemo(() => createLatestGate(), [])
   const jobsGate = useMemo(() => createLatestGate(), [])
+  // 详情是一次性读（不是事件尾段的实时视图），所以它只要一把自己的令牌：连着点两行时，
+  // 先回来的那份不许把后点开的那行喂成别人的状态。
+  const detailGate = useMemo(() => createLatestGate(), [])
+  const [openJob, setOpenJob] = useState<string | null>(null)
+  const [jobDetail, setJobDetail] = useState<TaskRecord | null>(null)
+
+  const toggleDetail = (id: string): void => {
+    if (openJob === id) {
+      setOpenJob(null)
+      setJobDetail(null)
+      return
+    }
+    setOpenJob(id)
+    setJobDetail(null)
+    const token = detailGate.begin()
+    void api.getTask(id)
+      .then((task) => { if (!detailGate.isCurrent(token)) return; setJobDetail(task) })
+      .catch((e: Error) => {
+        if (!detailGate.isCurrent(token)) return
+        setError({ key: 'schedule.actionFailed', message: e.message, labelKey: 'schedule.detail' })
+      })
+  }
 
   const reload = useCallback(() => {
     const token = boardGate.begin()
@@ -160,6 +182,7 @@ export function AutomationBoard({ api, canPatch, defaultCwd }: AutomationBoardPr
                 {st === 'active'
                   ? <button className="ckp__btn" disabled={busy} onClick={() => void act(() => api.pauseScheduleTask(task.id), 'schedule.pause')}>{t('schedule.pause')}</button>
                   : <button className="ckp__btn" disabled={busy} onClick={() => void act(() => api.patchScheduleTask(task.id, {}), 'schedule.resume')}>{t('schedule.resume')}</button>}
+                <button className="ckp__btn" disabled={busy} onClick={() => void act(() => api.runNowSchedule(task.id), 'schedule.runNow')}>{t('schedule.runNow')}</button>
                 <button className="ckp__btn ckp__btn--danger" disabled={busy} onClick={() => void act(() => api.deleteScheduleTask(task.id), 'schedule.delete')}>{t('schedule.delete')}</button>
               </div>
             </li>
@@ -189,6 +212,29 @@ export function AutomationBoard({ api, canPatch, defaultCwd }: AutomationBoardPr
                 {job.result && <code>{job.result.summary}</code>}
                 {job.error && <code>{job.error}</code>}
               </div>
+              <div className="sc__actions">
+                <button className="ckp__mini" onClick={() => toggleDetail(job.id)}>{t('schedule.detail')}</button>
+                {/* 取消要的就是 job id，所以它长在运行行上；重跑要的是定义 id，所以在上面的定义行上。
+                    终态行不给这颗钮——内核照单返回，点它只会把一条已经跑完的记录再写一遍。 */}
+                {(job.status === 'running' || job.status === 'pending') && (
+                  <button className="ckp__btn ckp__btn--danger" disabled={busy} onClick={() => void act(() => api.cancelTask(job.id), 'schedule.cancel')}>{t('schedule.cancel')}</button>
+                )}
+              </div>
+              {openJob === job.id && (
+                <div className="sc__detail">
+                  {jobDetail === null
+                    ? <code>{t('schedule.detailLoading')}</code>
+                    : (
+                      <>
+                        <code>{`status:${jobDetail.status}`}</code>
+                        <code>{`source:${jobDetail.source}`}</code>
+                        <code>{new Date(jobDetail.createdAt).toLocaleString()}</code>
+                        {jobDetail.result && <code>{jobDetail.result.summary}</code>}
+                        {jobDetail.error && <code>{jobDetail.error}</code>}
+                      </>
+                    )}
+                </div>
+              )}
             </li>
           ))}
           {jobs.length === 0 && (

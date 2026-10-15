@@ -2010,6 +2010,111 @@ report(brokenTables.length === 0, 'every README table renders (row widths match 
           ? `三态齐（一次/始终/拒绝）：自述必须提三态且"未覆盖"那行要撤（现测 claims3=${claims3} gapLine=${gapLine}）`
           : `现测 ${calls.length} 个 answerApproval 调用点 ⇒ 允许一次=${once} 始终允许=${always} 拒绝=${deny}；自述提三态=${claims3}、"未覆盖"那行=${gapLine}、台账 blocker 那句=${ledgerHasGap}`)
 }
+// --- 块 20：花钱路径的账单必须覆盖它自己创建的每一个会话，且归档一律排在账单之后 ---
+// 起因为真事：2026-10-15 那一趟打印「12 发」，但它只加了两份转录——grant 那轮的会话被一行排在
+// billing 之前的 `archiveSession` 烧掉了（归档=DELETE，转录随之没），所以那个数至今是个**下界**。
+// 硬列两条会话的账单就是这么漏的：加会话的人不会记得加第三行，而"账单看起来有数"照绿。
+{
+  const billFace = (s) => {
+    const created = [...s.matchAll(/\bconst\s+(\w+)\s*=\s*await\s+api\.createSession\(\s*\{/g)].map((m) => m[1])
+    const bills = [...s.matchAll(/\bspendOf\(\s*api\s*,\s*(\w+)\.id\b/g)].map((m) => ({ n: m[1], i: m.index }))
+    const arch = [...s.matchAll(/\bapi\.archiveSession\(\s*(\w+)\.id\s*\)/g)].map((m) => ({ n: m[1], i: m.index }))
+    const billed = [...new Set(bills.map((b) => b.n))]
+    const unbilled = created.filter((n) => !billed.includes(n))
+    const preBill = created.filter((n) => {
+      const a = arch.filter((x) => x.n === n).map((x) => x.i)
+      const b = bills.filter((x) => x.n === n).map((x) => x.i)
+      return a.length > 0 && b.length > 0 && Math.min(...a) < Math.max(...b)
+    })
+    return { created, billed, unbilled, preBill }
+  }
+  const F20 = "'"
+  const FIX20 = [
+    { s: `const ses = await api.createSession({ cwd: x })\nconst sp = await spendOf(api, ses.id)\nawait api.archiveSession(ses.id)`,
+      want: { created: ['ses'], billed: ['ses'], unbilled: [], preBill: [] } },
+    { s: `const a = await api.createSession({})\nconst b = await api.createSession({})\nawait spendOf(api, a.id)`,
+      want: { created: ['a', 'b'], billed: ['a'], unbilled: ['b'], preBill: [] } },
+    { s: `const c = await api.createSession({})\nawait api.archiveSession(c.id)\nawait spendOf(api, c.id)`,
+      want: { created: ['c'], billed: ['c'], unbilled: [], preBill: ['c'] } },
+    { s: `const d = await api.getSession(id)\nawait api.archiveSession(e.id)\nconst spendOf = 1`,
+      want: { created: [], billed: [], unbilled: [], preBill: [] } },
+  ]
+  const badFix = FIX20.map((f, k) => {
+    const got = billFace(f.s)
+    return JSON.stringify([got.created, got.billed, got.unbilled, got.preBill]) === JSON.stringify([f.want.created, f.want.billed, f.want.unbilled, f.want.preBill])
+      ? null : `夹具 ${k + 1}：期望 ${JSON.stringify(f.want)}，实读 ${JSON.stringify(got)}`
+  }).filter((x) => x !== null)
+  const dir20 = join(clientRoot, 'scripts')
+  const paidFiles = existsSync(dir20)
+    ? readdirSync(dir20).filter((f) => /^accept-.+\.ts$/.test(f) && /\bspends:\s*true\b/.test(readFileSync(join(dir20, f), 'utf8'))).sort()
+    : []
+  const perFile = paidFiles.map((f) => {
+    const raw = readFileSync(join(dir20, f), 'utf8')
+    const face = billFace(raw)
+    // 交叉一致性：`created` 只认"字面 `const X = await api.createSession({`"这一种形状，
+    // 把建会话藏进工厂函数/别名它就整个看不见（R2 反例实测：藏掉一个会话，门照绿）。
+    // 所以再数一次"这文件里到底出现了几处 `api.createSession(`"，两边必须相等——
+    // 不等就是抽取形状被绕开了，报红并点名差额，而不是静默按少掉的那份继续算账。
+    const mentions = (raw.split(/\r?\n/).filter((l) => !/^\s*\/\//.test(l)).join('\n').match(/\bapi\.createSession\(/g) ?? []).length
+    return { f, face, mentions }
+  })
+  // 下界只拦"两面皆空也算绿"那一种（会话被藏进工厂函数、名字抽不到 ⇒ 面塌了要红），
+  // 所以它是 **1**，不是照某一台的会话数写的 3——写 3 会把一台只开一个会话的合法脚本（accept-stream）判成缺陷。
+  const floor = 1
+  const bad = perFile.filter((p) => p.face.created.length < floor || p.face.created.length !== p.mentions || p.face.unbilled.length > 0 || p.face.preBill.length > 0)
+  report(paidFiles.length > 0 && badFix.length === 0 && bad.length === 0,
+    `花钱验收脚本的账单覆盖面（**每一台**声明 \`{ spends: true }\` 的 \`accept-*.ts\`：它创建的每个会话都要有一份读数、归档都要排在账单之后；从 \`createSession\`/\`spendOf\`/\`archiveSession\` 三个调用形状派生 + 四条夹具：齐账、少一个会话、归档抢跑、别的调用不算进来；下界 ${floor} 拦"两面皆空也算绿"）`,
+    paidFiles.length === 0 ? '面塌了：scripts/ 下一台声明 `{ spends: true }` 的 accept-*.ts 都没扫到，这一条没在量任何东西'
+      : badFix.length > 0 ? '抽取形状自证没过，这一条不作数：' + badFix.join(' ｜ ')
+        : bad.length > 0
+          ? bad.map((p) => `${p.f}：${p.face.created.length < floor ? `面里只有 ${String(p.face.created.length)} 个会话（${p.face.created.join('、') || '一个都没抽到'}）< 下界 ${floor} ⇒ createSession 的写法变了、账齐了也不作数` : ''}${p.face.created.length !== p.mentions ? `${p.face.created.length < floor ? ' ｜ ' : ''}形状交叉不一致：抽到 ${String(p.face.created.length)} 个名字，文件里却有 ${String(p.mentions)} 处 \`api.createSession(\` ⇒ 有会话藏在工厂函数/别名里，账单面数不到它` : ''}${p.face.unbilled.length ? `${p.face.created.length < floor || p.face.created.length !== p.mentions ? ' ｜ ' : ''}没读数的 ${p.face.unbilled.join('、')}` : ''}${p.face.preBill.length ? `${p.face.unbilled.length || p.face.created.length !== p.mentions || p.face.created.length < floor ? ' ｜ ' : ''}归档抢在账单前（转录会被 DELETE）的 ${p.face.preBill.join('、')}` : ''}`).join(' ｜ ')
+          : perFile.map((p) => `${p.f} 创建 ${String(p.face.created.length)} 个会话（${p.face.created.join('、')}，与文件里 ${String(p.mentions)} 处 \`api.createSession(\` 相等）逐名有读数且都排在归档之后`).join(' ｜ '))
+}
+// --- 块 21：不发钱的验收脚本，发送只能走 lib-instance 那三个受 keyless 兜的出口 ---
+// 起因是 `accept-panel.ts` 的真缺陷：它打印"这一发由内核本地受理、不会离开本机"，然后无条件
+// `api.prompt`，而它默认打的那台（`client/.sidecar-info.json`）就是**有 key** 的操作者实例。
+// 一句谎话 + 一发真上游。所以把不变量钉死：没声明 `{ spends: true }` 的 `accept-*.ts` 里，
+// `api.prompt|queue|sendOrQueue` 直连 0 处、裸 `fetch(...)/prompt` 0 处；要发就经过出口的现读守卫。
+{
+  const stripLineComments = (s) => s.split(/\r?\n/).filter((l) => !/^\s*\/\//.test(l)).join('\n')
+  const SEND_RE = /\bapi\.(?:prompt|queue|sendOrQueue)\s*\(/g
+  const rawPrompt = (s) => {
+    let n = 0
+    for (const m of s.matchAll(/\bfetch\(/g)) if (s.slice(m.index, m.index + 220).includes('/prompt')) n += 1
+    return n
+  }
+  const violationsOf = (body) => {
+    const s = stripLineComments(body)
+    return [...s.matchAll(SEND_RE)].map((m) => m[0]).concat(rawPrompt(s) > 0 ? [`裸 fetch → /prompt ×${String(rawPrompt(s))}`] : [])
+  }
+  const FIX21 = [
+    { name: '直连 api.prompt 被点名', body: `const x = await api.prompt(id, { prompt: 'a' })`, want: 1 },
+    { name: '走受守卫的出口不算违规', body: `const x = await sendPrompt(api, id, 'a', 'label')\nconst y = await api.health()`, want: 0 },
+    { name: '绕过客户端裸 fetch /prompt 也被点名', body: "const r = await fetch(`${info.baseUrl}/sessions/1/prompt`, { method: 'POST' })", want: 1 },
+    { name: '整行注释里的名字不算调用（剥的是行首 //，行尾注释仍计数）', body: `// 这里以前写 api.prompt(id, ...) 于是烧了一发\nconst z = 1`, want: 0 },
+    { name: '行尾注释藏不住调用（方向是宁多报不漏报）', body: `const z = 1 // api.prompt(id) 藏在行尾`, want: 1 },
+  ]
+  const badFix = FIX21.map((f) => (violationsOf(f.body).length === f.want ? null : `夹具「${f.name}」：期望 ${String(f.want)} 条违规，实读 ${String(violationsOf(f.body).length)}（${JSON.stringify(violationsOf(f.body))}）`)).filter((x) => x !== null)
+  const dir = join(clientRoot, 'scripts')
+  const files = existsSync(dir) ? readdirSync(dir).filter((f) => /^accept-.+\.ts$/.test(f)).sort() : []
+  const paid = []
+  const free = []
+  const bad = []
+  for (const f of files) {
+    const body = readFileSync(join(dir, f), 'utf8')
+    const declaresSpend = /\bspends:\s*true\b/.test(body)
+    ;(declaresSpend ? paid : free).push(f)
+    if (declaresSpend) continue
+    const v = violationsOf(body)
+    if (v.length > 0) bad.push(`${f}：${v.join('、')}`)
+  }
+  report(files.length > 0 && badFix.length === 0 && bad.length === 0,
+    `不发钱的验收脚本不许直连发送口（\`scripts/accept-*.ts\` 里没声明 \`{ spends: true }\` 的那些，\`api.prompt/queue/sendOrQueue\` 与裸 \`fetch → /prompt\` 必须为 0 处，发送只经 \`lib-instance\` 的现读守卫；5 条夹具：直连、走出口、裸 fetch、行首注释、行尾注释）`,
+    files.length === 0 ? '面塌了：scripts/ 下一个 accept-*.ts 都没扫到，这一条没在量任何东西'
+      : badFix.length > 0 ? '违规抽取的形状自证没过，这一条不作数：' + badFix.join(' ｜ ')
+        : bad.length > 0 ? bad.join(' ｜ ')
+          : `扫了 ${String(files.length)} 份：声明付费 ${String(paid.length)} 份（${paid.join('、')}），其余 ${String(free.length)} 份零直连；出口在 scripts/lib-instance.ts（sendPrompt / sendQueue / sendOrQueueGuarded / rawPromptPost，四个都现读 /health.configured）`)
+}
 if (failures.length > 0) {
   console.error(`\nFAILED: ${failures.join(' | ')}`)
   process.exit(1)

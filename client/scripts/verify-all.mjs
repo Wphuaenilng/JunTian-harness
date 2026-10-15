@@ -13,7 +13,7 @@
  * 它跑绿并接进了 ci-smoke——"决定做完了"就要从 parked 名单里走出去，留在这里会变成永久豁免。）
  */
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { listProjectRuntimes } from './lib-instance.mjs'
@@ -87,6 +87,35 @@ if (chosen.length === 0) {
 }
 
 const out = []
+// 全线的 containment 监视：`verify-accept-zero` 那一条只守它自己那 8 台，而 2026-10-15 实测到
+// 仓根 `.rivet/` 在**一次 14 步跑完之后**又少了 10 个文件（`ci-smoke --drift` 与 `pnpm test` 都被
+// 同一把尺子量成清白，见 EVIDENCE 那一格）——也就是说真删除者跑在这 14 步里，而当时没人看着。
+// 内核会往**会话 cwd 的父项目根**种并清 `.rivet/`（`src/agent/memory-epoch.ts` 那份 LEGACY_FILES
+// 按 `<cwd>` 删文件），所以"哪一步动的"必须逐台阶梯比，而不是只在首尾比一次。
+// 面 = 名字集合（数量会被内核正常写入的文件骗到）；判据 = 删了任何一条即红；新增**只打不判**
+// （那正是内核会做的事：skills/、artifacts/，把它判成违规会把修复本身挡在门外）。
+const rivetWatch = join(resolve(clientRoot, '..'), '.rivet')
+const listTree = (root) => {
+  const acc = []
+  const stack = [root]
+  while (stack.length > 0) {
+    const d = stack.pop()
+    let names = []
+    try { names = readdirSync(d) } catch { continue }
+    for (const name of names) {
+      const p = join(d, name)
+      let isDir = false
+      try { isDir = statSync(p).isDirectory() } catch { continue }
+      if (isDir) stack.push(p)
+      else acc.push(p.slice(root.length + 1).replace(/\\/g, '/'))
+    }
+  }
+  return acc.sort()
+}
+const rivetExists = existsSync(rivetWatch)
+let rivetNames = rivetExists ? listTree(rivetWatch) : []
+const rivetDrift = []
+if (!rivetExists) console.log(`  i containment 监视未启动：${rivetWatch} 不在（这台没跑过任何会话），下面那条判据会如实写"没在量"`)
 for (const s of chosen) {
   const started = Date.now()
   // 命令与参数都是本文件里的字面量（picked 只用于筛选，不进命令行），所以 shell:true 不引入注入面。
@@ -97,10 +126,24 @@ for (const s of chosen) {
   const all = String(r.stdout || '').concat(String(r.stderr || '')).trim().split(/\r?\n/).filter(Boolean)
   out.push({ ...s, code, secs: (Date.now() - started) / 1000, tail: (all.at(-1) ?? '').slice(0, 120), lines: all.slice(-24) })
   console.log(`${code === 0 ? '✓' : s.parked ? '•' : '✗'} ${s.label} — exit ${code}，${(Date.now() - started) / 1000}s`)
+  if (rivetExists) {
+    const nowNames = listTree(rivetWatch)
+    const gone = rivetNames.filter((x) => !nowNames.includes(x))
+    const fresh = nowNames.filter((x) => !rivetNames.includes(x))
+    if (gone.length > 0 || fresh.length > 0) {
+      console.log(`  i ${s.key} 这步动了仓根 .rivet/：删了 ${gone.join('、') || '（无）'}｜新增 ${fresh.join('、') || '（无）'}`)
+      if (gone.length > 0) rivetDrift.push(`${s.key}：删了 ${gone.join('、')}`)
+    }
+    rivetNames = nowNames
+  }
 }
 
 const failed = out.filter((s) => s.code !== 0 && !s.parked)
 const parked = out.filter((s) => s.code !== 0 && s.parked)
+// 干净 checkout（CI）上仓根可能根本没有 `.rivet/`——那种情形不许恒红（那是 #nongoals 那四条正控踩过的
+// 坑：把判据绑在脏工作树上）。所以**没目录就打一行"没在量"，不动退出码**；有目录而少了文件才红。
+console.log(`${rivetExists ? (rivetDrift.length === 0 ? '✓' : '✗') : 'i'} 验证跑不往操作者的工作树里删东西（仓根 \`.rivet/\` 的名字集合逐步相等；新增只报不判——内核本来会往会话 cwd 种 \`skills/\`） — ${rivetExists ? `全线跑完仍是 ${rivetNames.length} 个文件${rivetDrift.length ? `，越界的台子：${rivetDrift.join(' ｜ ')}` : '，逐步比对无一台删掉已有文件'}` : `${rivetWatch} 不存在 ⇒ 这一条本轮没在量任何东西（不是通过）`}`)
+if (rivetDrift.length > 0) failed.push({ key: 'containment', label: '验证跑不往操作者的工作树里删东西（仓根 `.rivet/`）', code: 1, secs: 0, tail: rivetDrift.join(' ｜ ').slice(0, 120), lines: rivetDrift })
 console.log(`\n${out.length} 步：失败 ${failed.length}，故意红 ${parked.length}${parked.length ? `（那 ${parked.length} 道门在等方向或记录已定的取舍，不是故障）` : '（没有）'}`)
 // 收尾自查（**只报不判，更不杀**）：这趟跑完本仓还剩几台 runtime 活着。
 // 2026-10-12 实测到的成因：崩在半路的运行会留下 `entry.js serve --port N` 的 daemon，而"照登记文件收"

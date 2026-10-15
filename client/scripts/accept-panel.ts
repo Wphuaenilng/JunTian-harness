@@ -30,7 +30,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } f
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { SidecarError } from '../packages/client-core/src/index.ts'
-import { openInstance } from './lib-instance.ts'
+import { openInstance, sendPrompt } from './lib-instance.ts'
 
 const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const { api, info, infoPath } = openInstance('检查点 / 文件面板的数据路径（档一自己造沙箱；rewind 绝不触发）')
@@ -143,16 +143,23 @@ if (explicitId !== undefined) {
     typeof created.id === 'string' && created.id.length > 0 && norm(rec.cwd).startsWith(norm(work)) && rec.workspaceSource === 'explicit',
     `cwd=${rec.cwd}，workspaceSource=${String(rec.workspaceSource)}，应当落在 ${work} 里`)
 
-  console.log('  i 花费声明：这台 configured:' + String(health?.configured) + '，下面这一发 /prompt 由内核本地受理、不会离开本机（只为让"有 run 但没工具落盘"这个形状真出现）')
-  const acc = await api.prompt(sessionId, { prompt: 'accept-panel: 造一个有 run、但没有工具落盘的会话' })
+  // 这句话以前无条件说"不会离开本机"，然后无条件 `api.prompt`——而这台脚本也常被手动挂到操作者那台
+  // **有 key** 的实例上（`client/.sidecar-info.json` 就是 configured:true）。那时它是谎话，而且真烧一发。
+  // 现在发送只有一个出口：`sendPrompt` 在发之前现读 `/health.configured`，有 key 就不发、返回 'not-sent'，
+  // ② 于是按"未测到"记红。守门的读数取自当场那次请求，不依赖调用方手里那份可能过期的布尔。
+  const acc = await sendPrompt(api, sessionId, 'accept-panel: 造一个有 run、但没有工具落盘的会话', '② 造一个"有过 run"的形状')
   let status = ''
-  for (let i = 0; i < 600; i++) {
-    status = (await api.getSession(sessionId)).status
-    if (status !== 'running') break
-    await sleep(100)
+  if (acc !== 'not-sent') {
+    for (let i = 0; i < 600; i++) {
+      status = (await api.getSession(sessionId)).status
+      if (status !== 'running') break
+      await sleep(100)
+    }
   }
   check('② 那一发被受理并走到终态（无 key ⇒ 预期 failed；这一发只用来制造"有过 run"这件事）',
-    acc === 'ok' && status !== 'running', `prompt 回 ${JSON.stringify(acc)}，终态 ${status}`)
+    acc === 'ok' && status !== 'running', acc === 'not-sent'
+      ? '这台有 key，那一发根本没发出去 ⇒ ② 未测到（把脚本挂回 configured:false 的隔离实例才量得到）'
+      : `prompt 回 ${JSON.stringify(acc)}，终态 ${status}`)
   // 快照取在 run 之后：内核那一次 `.rivet/` 播种已经算进基线，后面再变就是这一趟读操作干的。
   treeBefore = treeSnapshot(root)
   console.log(`  i 基线快照    ${String(treeBefore.split(',').length)} 个文件（含内核种下的 .rivet/）`)

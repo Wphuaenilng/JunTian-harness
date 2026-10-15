@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { SidecarClient } from '../packages/client-core/src/index.ts'
+import type { BusyResult } from '../packages/client-core/src/index.ts'
 
 const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -93,4 +94,64 @@ export function probeWorkspace(label: string): { cwd: string; note: string } {
   const cwd = note === '' ? base : `${base}-${process.pid}`
   mkdirSync(cwd, { recursive: true })
   return { cwd, note }
+}
+
+/**
+ * The only legal way for a **non-paying** acceptance script to put a message into a session.
+ *
+ * Why a function rather than a line in a README: `accept-panel.ts` used to print "这一发由内核本地
+ * 受理、不会离开本机" and then call `api.prompt` unconditionally — in a script family whose default
+ * registration (`client/.sidecar-info.json`) belongs to the operator's *keyed* instance. That is one
+ * real upstream call plus a line on screen claiming the opposite. Reading `/health` at the moment of
+ * sending is the version of the guard that cannot drift with a caller's stale boolean, and it makes
+ * the invariant statically checkable: outside the scripts that declare `{ spends: true }`, no direct
+ * `api.prompt(` / `api.queue(` / `api.sendOrQueue(` — which `check:docs` compares by name.
+ */
+async function refusesPaidSend(api: SidecarClient, label: string, via: string): Promise<boolean> {
+  const h = await api.health()
+  if (h.configured === true) {
+    console.log(`  i 花费声明：这台 configured:true ⇒「${label}」（走 ${via}）不发——发了就是真打上游。调用方这一条按"未测到"记红，不拿付费换证据。`)
+    return true
+  }
+  return false
+}
+
+export async function sendPrompt(api: SidecarClient, id: string, text: string, label: string): Promise<BusyResult | 'not-sent'> {
+  if (await refusesPaidSend(api, label, 'POST /prompt')) return 'not-sent'
+  return api.prompt(id, { prompt: text })
+}
+
+export async function sendQueue(api: SidecarClient, id: string, text: string, label: string): Promise<{ laneId: string } | 'idle' | 'not-sent'> {
+  if (await refusesPaidSend(api, label, 'POST /queue')) return 'not-sent'
+  return api.queue(id, text)
+}
+
+export async function sendOrQueueGuarded(api: SidecarClient, id: string, text: string, label: string): Promise<'ok' | 'queued' | 'lost' | 'not-sent'> {
+  if (await refusesPaidSend(api, label, 'POST /queue 与 /prompt 的交接')) return 'not-sent'
+  return api.sendOrQueue(id, text)
+}
+
+/**
+ * The line-level control `accept-queue.ts` needs: hit `POST /sessions/:id/prompt` with `fetch`,
+ * bypassing the client, to prove the 409/`code:"busy"` mapping is the kernel's and not ours.
+ *
+ * It gets the same guard as `sendPrompt` — a raw fetch is still a real call. Returns the status and
+ * the body's `code`, or `status: 0` with a note when the instance has a key (the caller's judgement
+ * then reads "未测到" rather than passing on a paid call).
+ */
+export async function rawPromptPost(info: InstanceHandle['info'], id: string, text: string, label: string): Promise<{ status: number; code: string; refused: boolean }> {
+  const url = `${info.baseUrl}/sessions/${encodeURIComponent(id)}/prompt`
+  const probe = await fetch(`${info.baseUrl}/health`, { headers: { authorization: `Bearer ${info.token}` } }).catch(() => null)
+  const body = (await probe?.json().catch(() => null)) as { configured?: boolean } | null
+  if (body?.configured === true) {
+    console.log(`  i 花费声明：这台 configured:true ⇒「${label}」（走 ${url}）不发——裸 fetch 也是真打上游。调用方这一条按"未测到"记红。`)
+    return { status: 0, code: 'not-sent', refused: true }
+  }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${info.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ prompt: text }),
+  })
+  const j = (await res.json().catch(() => ({}))) as { code?: string; error?: string }
+  return { status: res.status, code: String(j.code ?? ''), refused: false }
 }

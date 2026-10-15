@@ -89,9 +89,20 @@ if (!keyless) {
     const preB = (await raw('GET', `/tasks/${enc(rowB.id)}`)).body?.task as TaskRecord | undefined
     const cancel = await raw('POST', `/tasks/${enc(rowB.id)}/cancel`)
     const postB = cancel.body?.task as TaskRecord | undefined
-    check('⑥ running 上的 cancel 得到 200 且终态是 cancelled',
-      cancel.status === 200 && postB?.status === (preB?.status === 'running' ? 'cancelled' : preB?.status),
-      `cancel 前=${preB?.status ?? '?'} → 后=${postB?.status ?? '?'}（status=${cancel.status}）`)
+    check('⑥a cancel 回 200 且把改写后的记录包在 {task} 里带回（形状判据，与落在哪个状态无关）',
+      cancel.status === 200 && typeof postB?.id === 'string',
+      `status=${cancel.status} body keys=${Object.keys(cancel.body ?? {}).join(',')}`)
+    // ⑥b 分两种形状各说各话——这条判据今天就是因为守护进程的 cwd 被搬进临时根而第一次撞上后者：
+    // 无 key 的 run 在干净目录里几百毫秒就 self-failed，脚本来不及把它抓在 running 上取消。
+    // 内核那半的实情（`src/server/task-registry.ts` 的 cancel 注释只写"cancelled 是终态，不可被覆盖"，
+    // transition 里没有对 failed/completed 的终态保护）：**已失败的记录也能被 cancel 改写成 cancelled**，
+    // 失败原因就此丢掉。客户端因此不能拿 status==='cancelled' 当"用户主动取消"的唯一信号——#28 的
+    // 面板据此只在非终态行才给「取消这次运行」按钮（那条判据在 check-live-geometry 里）。
+    const preTerminal = preB !== undefined && preB.status !== 'running' && preB.status !== 'pending'
+    check(`⑥b ${preTerminal ? 'cancel 打在**已终态**的记录上：内核照样回 200 并把终态改写成 cancelled（已知缺陷，见 EVIDENCE 那一格——界面不能只看 status 判"用户取消"）'
+      : 'cancel 打在 running 上得到 cancelled（这一跑的 run 还没自报终态，抓到的是忙时那一半）'}`,
+      postB?.status === 'cancelled',
+      `cancel 前=${preB?.status ?? '?'} → 后=${postB?.status ?? '?'}${preTerminal ? '；若内核以后加了终态保护、这里不再被改写，这条会红：那时要一起改的是判据与台账那句' : ''}`)
 
     const detailA = await raw('GET', `/tasks/${enc(rowA.id)}`)
     check('⑦ GET /tasks/:id 把记录包在 {task:{}} 里回（不是裸记录——照裸形状解析的界面读到的是 undefined）',

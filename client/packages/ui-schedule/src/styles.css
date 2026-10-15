@@ -19,6 +19,9 @@
 .sc__meta { display: flex; flex-wrap: wrap; gap: 5px; margin: 5px 0 7px; }
 .sc__meta code { font-family: var(--font-code); font-size: 10px; color: var(--label-secondary); background: var(--bg-inline-code); border-radius: 4px; padding: 1px 5px; word-break: break-all; }
 .sc__actions { gap: 6px; }
+/* 行内展开的详情：一次性读回的那条记录，字段口径与列表行一致（wire 值不翻译）。 */
+.sc__detail { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; padding: 5px 6px; border: 1px solid var(--border-l1); border-radius: 5px; }
+.sc__detail code { font-family: var(--font-code); font-size: 10px; color: var(--label-secondary); background: var(--bg-inline-code); border-radius: 4px; padding: 1px 5px; word-break: break-all; }
 .sc__new { border-top: 1px solid var(--border-l1); padding-top: 10px; display: flex; flex-direction: column; gap: 7px; }
 .sc__prompt-input, .sc__spec {
   font: inherit; font-size: 12px; padding: 6px 8px; border: 1px solid var(--border-l2);

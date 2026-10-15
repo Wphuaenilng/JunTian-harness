@@ -436,6 +436,8 @@ try {
     workbenchSync: 'accept-gitwrite.ts 连着本地 bare 远端真走过 fetch 与 confirm 后的 push；本面没有远端，也不在这里重复对外动作',
     sessionMergeBack: 'accept-gitwrite.ts 在一次性仓库＋本地 bare 远端真走过这条合并链；本面没有可信远端，也不重复对外动作',
     sessionOpenPr: 'accept-gitwrite.ts 断言它在沙箱里被拒（title 写着 must not open）——那条路由被发到过，但不许真建 PR',
+    cancelTask: '取消要有还活着的 job，本面不为此真起一次 run；accept-tasks.ts 在真记录上发过这条（`/tasks/:id/cancel`：running 上取消得 200，且 cancelled 不被随后到达的 failed 盖掉）',
+    runNowSchedule: '发它就是真起一次调度 run（通向模型），本面零上游花费的前提不容它；accept-tasks.ts 用它当场造真 job 记录（`/schedule/:id/run-now` 两条，受理并回 triggered:true）',
   }
   const { paths: writes, unresolved: unresolvedWrites } = deriveWritePaths()
   const unassigned = writes.filter((w) => !WRITE_PROBE[w.name] && !WRITE_SKIP[w.name]).map((w) => `${w.name} ${w.verb}`)
@@ -456,7 +458,18 @@ try {
     for (const f of reason.match(/([a-z-]+\.(?:mjs|ts))/g) ?? []) {
       const p = join(clientRoot, 'scripts', f)
       if (!existsSync(p)) { badExcuse.push(`${name}：理由指的文件不存在（scripts/${f}）`); continue }
-      if (!readFileSync(p, 'utf8').includes(`api.${name}`)) badExcuse.push(`${name}：理由说 ${f} 覆盖，那份文件里没有 api.${name}`)
+      const src = readFileSync(p, 'utf8')
+      if (src.includes(`api.${name}`)) continue
+      // 第二种证据：理由里用反引号点名的**路由本身**（`/tasks/:id/cancel` 这种）。
+      // 这一族里有些验收脚本走 raw('POST', …) 直接打线上形状（accept-tasks.ts 就是），
+      // 那时"这条路由发过"是真话，而 `api.<方法名>` 永远不出现——按方法名回读会把真话判成假话。
+      const cited = [...reason.matchAll(/`(\/[\w:./-]+)`/g)].map((m) => m[1])
+      const segOk = cited.filter((pth) => {
+        const segs = pth.split('/').filter((s) => s !== '' && !s.startsWith(':'))
+        return segs.length >= 2 && segs.every((s) => src.includes(s))
+      })
+      if (segOk.length > 0) continue
+      badExcuse.push(`${name}：理由说 ${f} 覆盖，但那份文件里既没有 api.${name}，也没有理由点名的路由（${cited.length ? cited.join(' , ') : '没引用路由'}）`)
     }
   }
   check(`每条 skip 理由点名的家都真调过这个方法（${Object.keys(WRITE_SKIP).length} 条理由里有 ${namedHomes} 条指向具体脚本，逐条回读）`, badExcuse.length === 0,

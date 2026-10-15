@@ -12,6 +12,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { SidecarClient, SessionModel, openSessionStream } from '../packages/client-core/src/index.ts'
 import { openInstance } from './lib-instance.ts'
+import { spendOf } from './lib-spend.ts'
 
 const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = resolve(clientRoot, '..')
@@ -102,6 +103,13 @@ const failures: string[] = []
 if (!streamed) failures.push(`not incremental: delta frames at ${liveDeltaSeqs.size} distinct seqs`)
 if (!completed) failures.push('no turn_complete event')
 if (st.terminalStatus === 'failed') failures.push('run failed')
+
+// 花钱的路径自己带账单（与 accept-approval.ts 同一条规矩，由 `check:docs` 的账单覆盖面盯着）：
+// 这台以前只报"发了几帧 delta"，从不报它打了上游几次——数不出来的花费等于没花，那是自欺。
+// 必须排在归档之前：归档=DELETE，转录一带走就读不到账了。
+const spend = await spendOf(api, session.id, st.lastSeq)
+console.log(`上游账单    : ${spend.calls} 发 · 输入 ${spend.inTok} tok · 输出 ${spend.outTok} tok · 回填到磁盘头=${spend.atHead ? '是' : '否'}（来源=会话转录冷通道）`)
+if (spend.calls === 0 || !spend.atHead) failures.push(`本轮花费无从核对（转录里读到 ${spend.calls} 发、回填到磁盘头=${spend.atHead}）⇒ 打了上游却拿不出账单，按"未测到"记红`)
 
 await api.archiveSession(session.id)
 if (failures.length > 0) {
