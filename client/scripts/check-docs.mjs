@@ -2070,6 +2070,53 @@ report(brokenTables.length === 0, 'every README table renders (row widths match 
           ? bad.map((p) => `${p.f}：${p.face.created.length < floor ? `面里只有 ${String(p.face.created.length)} 个会话（${p.face.created.join('、') || '一个都没抽到'}）< 下界 ${floor} ⇒ createSession 的写法变了、账齐了也不作数` : ''}${p.face.created.length !== p.mentions ? `${p.face.created.length < floor ? ' ｜ ' : ''}形状交叉不一致：抽到 ${String(p.face.created.length)} 个名字，文件里却有 ${String(p.mentions)} 处 \`api.createSession(\` ⇒ 有会话藏在工厂函数/别名里，账单面数不到它` : ''}${p.face.unbilled.length ? `${p.face.created.length < floor || p.face.created.length !== p.mentions ? ' ｜ ' : ''}没读数的 ${p.face.unbilled.join('、')}` : ''}${p.face.preBill.length ? `${p.face.unbilled.length || p.face.created.length !== p.mentions || p.face.created.length < floor ? ' ｜ ' : ''}归档抢在账单前（转录会被 DELETE）的 ${p.face.preBill.join('、')}` : ''}`).join(' ｜ ')
           : perFile.map((p) => `${p.f} 创建 ${String(p.face.created.length)} 个会话（${p.face.created.join('、')}，与文件里 ${String(p.mentions)} 处 \`api.createSession(\` 相等）逐名有读数且都排在归档之后`).join(' ｜ '))
 }
+// --- 块 22：教 node 版本约束的三份指令文件 + 两份配置/报告，写的 engines 值必须等于 package.json 的真值 ---
+// 起因是 #101：同一件事曾有四种说法（根 `>=24` / AGENTS 与 .rivet 与 CLAUDE 写"钉 24.18.0" /
+// ci.yml 注释写"钉 24.1.0"），而两个假说法还互相矛盾——2026-10-15 由用户「#101 顺手改」授权后一次改齐。
+// 射程说明（这是两条独立宣称，分开写清）：**扫哪些文件**=只扫"教约束"的指令面与配置面；
+// `client/EVIDENCE.md` 与 `client/README.md` 里那些引用旧错值的句子是**历史记录**（它们正是在说这几个字是错的），
+// 故意不在面内——把它们判红等于要求台账不许引用被纠正过的措辞。**认哪些形状**=带 `engines` 字样的行里的版本 token。
+{
+  const pkgPath = join(clientRoot, '..', 'package.json')
+  let realEngines = ''
+  try { realEngines = String(JSON.parse(readFileSync(pkgPath, 'utf8')).engines?.node ?? '') } catch { /* 读不到就在下面报红 */ }
+  const norm = (v) => String(v).replace(/\s+/g, '')
+  const CLAIM_FILES = ['AGENTS.md', '.rivet.md', 'CLAUDE.md', '.github/workflows/ci.yml', 'analysis-reports/项目文档与对比报告.md']
+  const claimsIn = (body) => {
+    const out = []
+    const push = (v) => { const n = norm(v); if (!out.includes(n)) out.push(n) }
+    for (const line of body.split(/\r?\n/)) {
+      if (!/engines/i.test(line)) continue
+      for (const m of line.matchAll(/engines[^\n]{0,80}?(\d{2}\.\d{1,2}\.\d{1,2}|>=\s*\d{2}(?:\.\d+){0,2})/gi)) push(m[1])
+      for (const m of line.matchAll(/engines\.node[^0-9\n]{0,12}"([^"]+)"/gi)) push(m[1])
+    }
+    return out
+  }
+  const FIX22 = [
+    { s: '根 `package.json` 的 `engines.node` 是 `">=24"`', want: ['>=24'] },
+    { s: 'Node.js 24（engines 钉 24.18.0）', want: ['24.18.0'] },
+    { s: '# engines 钉 24.1.0 且 .npmrc engine-strict=true', want: ['24.1.0'] },
+    { s: 'node-version: [24]  # setup-node 用 24', want: [] },
+  ]
+  const badFix = FIX22.map((f) => {
+    const got = claimsIn(f.s)
+    return JSON.stringify(got) === JSON.stringify(f.want) ? null : `夹具「${f.s}」应抽 ${JSON.stringify(f.want)}，实抽 ${JSON.stringify(got)}`
+  }).filter((x) => x !== null)
+  const stale = []
+  const missing = []
+  for (const rel of CLAIM_FILES) {
+    const p = join(clientRoot, '..', rel)
+    if (!existsSync(p)) { missing.push(rel); continue }
+    for (const v of claimsIn(readFileSync(p, 'utf8'))) if (norm(v) !== norm(realEngines)) stale.push(`${rel}：写着 ${JSON.stringify(v)} 而真值是 ${JSON.stringify(realEngines)}`)
+  }
+  report(realEngines !== '' && missing.length === 0 && badFix.length === 0 && stale.length === 0,
+    `engines 的文档措辞等于 \`package.json\` 真值（面=${CLAIM_FILES.length} 份"教约束"的文件：${CLAIM_FILES.join(' / ')}；台账里引用旧错值的历史句子**故意不在面内**；4 条夹具：真范围、两种旧错写法各抽出一个版本号、没有 engines 字样的行不算）`,
+    realEngines === '' ? `读不到 ${pkgPath} 里的 engines.node——这一条没在量任何东西`
+      : badFix.length > 0 ? '版本号抽取的形状自证没过，这一条不作数：' + badFix.join(' ｜ ')
+        : missing.length > 0 ? `名册里的文件读不到：${missing.join('、')}（改名要连名册一起改）`
+          : stale.length > 0 ? stale.join(' ｜ ')
+            : `${CLAIM_FILES.length} 份文件里带 engines 字样的版本号全部等于 ${JSON.stringify(realEngines)}（真值取自 ${pkgPath}）`)
+}
 // --- 块 21：不发钱的验收脚本，发送只能走 lib-instance 那三个受 keyless 兜的出口 ---
 // 起因是 `accept-panel.ts` 的真缺陷：它打印"这一发由内核本地受理、不会离开本机"，然后无条件
 // `api.prompt`，而它默认打的那台（`client/.sidecar-info.json`）就是**有 key** 的操作者实例。
@@ -2114,6 +2161,120 @@ report(brokenTables.length === 0, 'every README table renders (row widths match 
       : badFix.length > 0 ? '违规抽取的形状自证没过，这一条不作数：' + badFix.join(' ｜ ')
         : bad.length > 0 ? bad.join(' ｜ ')
           : `扫了 ${String(files.length)} 份：声明付费 ${String(paid.length)} 份（${paid.join('、')}），其余 ${String(free.length)} 份零直连；出口在 scripts/lib-instance.ts（sendPrompt / sendQueue / sendOrQueueGuarded / rawPromptPost，四个都现读 /health.configured）`)
+}
+// --- 块 22：每台验收会话的 cwd 必须解析到仓外（源码级——行为级那道只在有人真跑那一趟时才有效）---
+// 起因是 #174 那一族的最后一处漏网：`accept-stream.ts` 一路带着 `cwd: repoRoot` 活了 4 天。
+// 当时的守卫是 `verify-accept-zero` 的"仓根 `.rivet/` 前后计数"，可那一趟是**零花费**的，而它声明
+// `{ spends: true }`、永远进不了那趟的名单——行为计数守不到不跑的路径。内核往**任何会话 cwd** 种
+// `.rivet/`（skills + meridian.db/-shm/-wal），而 `src/agent/memory-epoch.ts` 的 LEGACY_FILES 还按
+// `<cwd>` **删**其中已有的文件，所以这不是整洁问题：真 run 一次就可能删掉操作者库里的一条。
+// 落点认不出来也算违规（不许把"我看不出它落哪"当成通过），没给 cwd 同样算——那等于赌对端是怎么起的。
+{
+  const strip = (s) => s.split(/\r?\n/).filter((l) => !/^\s*\/\//.test(l)).join('\n')
+  const ROOT = /(clientRoot\s*,\s*['"]\.\.['"]|\brepoRoot\b|process\.cwd\(\))/
+  const TMP = /(\bprobeWorkspace\b|tmpdir\()/
+  const REG = /(infoPath|stateDir)/
+  const IGN = /\.sidecar-data/
+  const BUCKET = {
+    root: '操作者仓根',
+    tmp: '系统临时目录（probeWorkspace）',
+    reg: '跟着这次用的登记文件走（caller 的临时目录）',
+    ign: '仓内 gitignore 沙箱（client/.sidecar-data）',
+    opaque: '认不出落点',
+    nocwd: '没给 cwd（落点交给对端怎么起的）',
+  }
+  const argObj = (s, braceIdx) => {
+    let depth = 0
+    for (let i = braceIdx; i < s.length; i += 1) {
+      const c = s[i]
+      if (c === '{') depth += 1
+      else if (c === '}') { depth -= 1; if (depth === 0) return s.slice(braceIdx, i + 1) }
+    }
+    return s.slice(braceIdx, braceIdx + 600)
+  }
+  const faceOf = (body) => {
+    const s = strip(body)
+    const defs = new Map()
+    for (const d of s.matchAll(/\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*([^;\n]+)/g)) if (!defs.has(d[1])) defs.set(d[1], d[2].trim())
+    const calls = [...s.matchAll(/\bapi\.createSession\(\s*\{/g)]
+    const trace = (expr) => {
+      let cur = expr
+      for (let hop = 0; hop < 6; hop += 1) {
+        if (ROOT.test(cur)) return { k: 'root', text: cur }
+        if (TMP.test(cur)) return { k: 'tmp', text: cur }
+        if (REG.test(cur)) return { k: 'reg', text: cur }
+        if (IGN.test(cur)) return { k: 'ign', text: cur }
+        const next = (cur.match(/[A-Za-z_$][\w$]*/g) ?? []).map((n) => defs.get(n)).filter((v) => typeof v === 'string')
+        if (next.length === 0) return { k: 'opaque', text: cur }
+        cur = next.join(' ')
+      }
+      return { k: 'opaque', text: cur }
+    }
+    const windows = calls.map((m) => {
+      const obj = argObj(s, m.index + m[0].length - 1)
+      const cwd = /\bcwd:\s*([^,\n}]+)/.exec(obj)
+      return cwd === null || cwd === undefined ? { k: 'nocwd', text: obj.replace(/\s+/g, ' ').slice(0, 70) } : trace(cwd[1].trim())
+    })
+    return { windows, broad: (s.match(/\bcreateSession\b/g) ?? []).length, narrow: calls.length }
+  }
+  const shape = (f) => `${String(f.w.narrow)}窄/${String(f.w.broad)}宽[${f.w.windows.map((x) => x.k).join(',')}]`
+  const FIX22 = [
+    { n: 'ws.cwd 追到 probeWorkspace ⇒ 临时目录档', body: `const ws = probeWorkspace('k')\nconst s = await api.createSession({ cwd: ws.cwd })`, want: '1窄/1宽[tmp]' },
+    { n: '字面 repoRoot ⇒ 仓根档', body: `const repoRoot = resolve(clientRoot, '..')\nconst s = await api.createSession({ cwd: repoRoot, title: 't' })`, want: '1窄/1宽[root]' },
+    { n: '两跳（base = join(repoRoot,…）也追得到', body: `const repoRoot = resolve(clientRoot, '..')\nconst base = join(repoRoot, 'x')\nconst s = await api.createSession({ cwd: base })`, want: '1窄/1宽[root]' },
+    { n: '没给 cwd 也算一条，档名单独', body: `const s = await api.createSession({ title: 't' })`, want: '1窄/1宽[nocwd]' },
+    { n: '行首注释里的调用不作数（面为空）', body: `// const s = await api.createSession({ cwd: repoRoot })\nconst z = 1`, want: '0窄/0宽[]' },
+    { n: '跟着登记文件走的沙箱 ⇒ reg 档（三跳）', body: `const { infoPath } = openInstance('x')\nconst stateDir = dirname(infoPath)\nconst root = join(stateDir, 'panel-sandbox')\nconst work = join(root, 'work')\nconst s = await api.createSession({ cwd: work })`, want: '1窄/1宽[reg]' },
+    { n: '认不出落点不许静默放过 ⇒ opaque', body: `const mystery = somethingElse()\nconst s = await api.createSession({ cwd: mystery })`, want: '1窄/1宽[opaque]' },
+    { n: '别名调用被宽窄不等抓出（窄 0 宽 1）', body: `const cs = api.createSession\nconst s = await cs({ cwd: ws.cwd })`, want: '0窄/1宽[]' },
+  ]
+  const badFix = FIX22.map((f) => {
+    const got = faceOf(f.body)
+    const s = shape({ w: got })
+    return s === f.want ? null : `夹具「${f.n}」：期望 ${f.want}，实读 ${s}`
+  }).filter((x) => x !== null)
+
+  // 两条前提各自要读真契约，不许只信档名：tmp 档成立是因为共用件真把落点建在 tmpdir 里，
+  // reg/ign 档成立是因为那个目录真被 .gitignore 罩着。
+  const libSrc = existsSync(join(clientRoot, 'scripts', 'lib-instance.ts')) ? readFileSync(join(clientRoot, 'scripts', 'lib-instance.ts'), 'utf8') : ''
+  const pwBody = (/export function probeWorkspace[\s\S]*?\n\}/.exec(strip(libSrc)) ?? [''])[0]
+  const pwOk = /\btmpdir\(\s*\)/.test(pwBody) && !ROOT.test(pwBody)
+  const pwFix = [
+    { body: `export function probeWorkspace(l) {\n  const base = join(tmpdir(), l)\n  return { cwd: base }\n}`, want: true },
+    { body: `export function probeWorkspace(l) {\n  const base = join(clientRoot, '..', l)\n  return { cwd: base }\n}`, want: false },
+  ].map((f, i) => ((/\btmpdir\(\s*\)/.test(f.body) && !ROOT.test(f.body)) === f.want ? null : `pw 夹具 ${String(i + 1)} 没过`)).filter((x) => x !== null)
+  const giSrc = existsSync(join(clientRoot, '.gitignore')) ? readFileSync(join(clientRoot, '.gitignore'), 'utf8') : ''
+  const giLine = giSrc.split(/\r?\n/).map((l, i) => ({ l: l.trim(), n: i + 1 })).find((x) => x.l === '.sidecar-data/')
+  const giFix = [
+    { body: 'node_modules/\n.sidecar-data/\n', want: true },
+    { body: 'node_modules/\ntmp-data/\n', want: false },
+  ].map((f, i) => (f.body.split(/\r?\n/).map((x) => x.trim()).includes('.sidecar-data/') === f.want ? null : `gitignore 夹具 ${String(i + 1)} 没过`)).filter((x) => x !== null)
+
+  const dir = join(clientRoot, 'scripts')
+  const files = existsSync(dir) ? readdirSync(dir).filter((f) => /^accept-.+\.ts$/.test(f)).sort() : []
+  const bad = []
+  const perFile = []
+  let windowsTotal = 0
+  const bucketTotal = {}
+  for (const f of files) {
+    const w = faceOf(readFileSync(join(dir, f), 'utf8'))
+    windowsTotal += w.windows.length
+    for (const x of w.windows) bucketTotal[x.k] = (bucketTotal[x.k] ?? 0) + 1
+    if (w.broad !== w.narrow) { bad.push(`${f}：抽到 ${String(w.narrow)} 个 \`api.createSession({\` 窗口，文件里却有 ${String(w.broad)} 处 \`createSession\` 这个名字 ⇒ 要么有会话藏在别名/工厂里（落点面数不到它），要么那名字出现在字符串/类型里——两种都要人看一眼，不许按少掉的那份继续算绿`); continue }
+    const v = w.windows.filter((x) => x.k === 'root' || x.k === 'opaque' || x.k === 'nocwd')
+    if (v.length > 0) bad.push(`${f}：${v.map((x) => `${BUCKET[x.k]}←\`${x.text.replace(/\s+/g, ' ').slice(0, 90)}\``).join('、')}`)
+    const cnt = {}
+    for (const x of w.windows) cnt[x.k] = (cnt[x.k] ?? 0) + 1
+    perFile.push(`${f} ${String(w.windows.length)} 处〔${Object.entries(cnt).map(([k, n]) => `${BUCKET[k]}×${String(n)}`).join('，') || '无会话'}〕`)
+  }
+  report(files.length > 0 && windowsTotal >= 1 && badFix.length === 0 && pwFix.length === 0 && giFix.length === 0 && pwOk && giLine !== undefined && bad.length === 0,
+    `验收脚本每台会话的 cwd 都要解析得到仓外（\`scripts/accept-*.ts\` 里 \`api.createSession\` 的 \`cwd:\` 表达式沿同文件 \`const/let\` 定义做传递闭包，落点必须归进四档之一：\`${BUCKET.tmp}\`／\`${BUCKET.reg}\`／\`${BUCKET.ign}\`／\`${BUCKET.root}\`；后三档之外的 \`认不出落点\` 与 \`没给 cwd\` 都算违规；两条前提读真契约（\`probeWorkspace\` 函数体里真有 \`tmpdir()\`、\`client/.gitignore\` 真有 \`.sidecar-data/\` 那行）；窄窗数≠宽调用数即红，8 条形状夹具含别名与注释）`,
+    files.length === 0 ? '面塌了：scripts/ 下一个 accept-*.ts 都没扫到，这一条没在量任何东西'
+      : badFix.length > 0 || pwFix.length > 0 || giFix.length > 0 ? '夹具自证没过，这一条不作数：' + [...badFix, ...pwFix, ...giFix].join(' ｜ ')
+        : !pwOk ? `前提破了：lib-instance.ts 的 probeWorkspace 函数体不再从 tmpdir() 起（现读：${pwBody.replace(/\s+/g, ' ').slice(0, 120) || '整个函数都没扫到'}），"临时目录"那一档等于在骗人`
+          : giLine === undefined ? '前提破了：client/.gitignore 里没有 `.sidecar-data/` 那一行，"仓内 gitignore 沙箱"那一档会把探针写进 tracked 面'
+            : bad.length > 0 ? bad.join(' ｜ ')
+              : `扫 ${String(files.length)} 份、${String(windowsTotal)} 台会话〔${Object.entries(bucketTotal).map(([k, n]) => `${k}×${String(n)}`).join('，')}〕；pw 函数体=${pwBody.replace(/\s+/g, ' ').slice(0, 52)}…，gitignore 第 ${String(giLine.n)} 行="${giLine.l}"；逐档 ${perFile.filter((p) => !/0 处/.test(p)).join(' ｜ ')}`)
 }
 if (failures.length > 0) {
   console.error(`\nFAILED: ${failures.join(' | ')}`)
