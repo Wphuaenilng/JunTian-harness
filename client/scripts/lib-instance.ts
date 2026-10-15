@@ -43,6 +43,33 @@ export function openInstance(what: string, opts: { spends?: boolean } = {}): Ins
 }
 
 /**
+ * Ask the registered instance one bounded question before a script trusts it.
+ *
+ * Without this, a registration left over from a finished run (`client/.sidecar-info.json` can sit
+ * there for days, pointing at a pid that no longer exists) makes every acceptance script die on the
+ * first real call with a raw `TypeError: fetch failed` — and the file itself still claims
+ * `configured: true`, so a script that trusts it would skip its own "no provider" guard.
+ */
+export async function assertInstanceAlive(h: InstanceHandle, ms = 4000): Promise<void> {
+  let why = ''
+  try {
+    const res = await fetch(`${h.info.baseUrl}/health`, {
+      headers: { authorization: `Bearer ${h.info.token}` },
+      signal: AbortSignal.timeout(ms),
+    })
+    if (res.status === 401) why = 'HTTP 401 — token 与这台应答者不匹配（端口多半已被别人占走）'
+    else if (!res.ok) why = `HTTP ${res.status}`
+  } catch (e) {
+    why = `${(e as Error).name}: ${(e as Error).message}`
+  }
+  if (why !== '') {
+    console.error(`✗ 登记里的实例没有正常应答：${h.info.baseUrl}（登记文件 ${h.infoPath}）— ${why}`)
+    console.error('  这通常是躺了几天的死登记：先跑 node scripts/launch-sidecar.mjs 起一台，或显式 --info=<state-dir>/.sidecar-info.json')
+    process.exit(2)
+  }
+}
+
+/**
  * A scratch workspace for a probe session — in the OS temp dir, never the repo.
  *
  * Why this is a rule instead of a detail: the runtime seeds `<session cwd>/.rivet/` (its skills plus

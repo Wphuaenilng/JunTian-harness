@@ -458,18 +458,29 @@ check('涂色属性谓词覆盖到产品 CSS 里真在用色族成员的每一�
   // 铁律第 1 条仍然只管**已跟踪**文件：工作树里别人在用的目录（`.rivet/`、`analysis-reports/`）不读。
   const infra = spawnSync('git', ['ls-files', '--others', '--exclude-standard', '-z', '--', '.github'], { cwd: repoRoot, encoding: 'utf8' })
   const infraChanged = spawnSync('git', ['diff', '--name-only', '-z', '--', '.github'], { cwd: repoRoot, encoding: 'utf8' })
-  if (others.status !== 0 || changed.status !== 0 || infra.status !== 0 || infraChanged.status !== 0) {
-    check('git 能列出 client/ 与 .github/ 的未跟踪与已改文件', false,
-      String(others.stderr || changed.stderr || infra.stderr || infraChanged.stderr || '').trim().slice(0, 120))
+  // 面必须**从 git 的已跟踪侧也派生一份**。此前这四条正控全部只看"未提交的差集"（未跟踪 + 已改），
+  // 那是把工作树的形状当成了恒定的东西：2026-10-14 那次提交之后差集塌成 4 项，四条判定一起红
+  // （台账「check:nongoals 四条正控绑脏工作树 ⇒ 干净树/CI 恒红」记的就是这一格，今天现实追上了预言）。
+  // 真正要扫的东西是"会进仓/已进仓的那份交付面"，它与提交节奏无关。
+  const trackedClient = spawnSync('git', ['ls-files', '-z', '--', 'client'], { cwd: repoRoot, encoding: 'utf8' })
+  const trackedInfra = spawnSync('git', ['ls-files', '-z', '--', '.github'], { cwd: repoRoot, encoding: 'utf8' })
+  if (others.status !== 0 || changed.status !== 0 || infra.status !== 0 || infraChanged.status !== 0
+    || trackedClient.status !== 0 || trackedInfra.status !== 0) {
+    check('git 能列出 client/ 与 .github/ 的已跟踪、未跟踪与已改文件', false,
+      String(others.stderr || changed.stderr || infra.stderr || infraChanged.stderr || trackedClient.stderr || trackedInfra.stderr || '').trim().slice(0, 120))
   } else {
     const nul = (s) => String(s ?? '').split('\0').filter(Boolean)
     const infraListed = [...new Set([...nul(infra.stdout), ...nul(infraChanged.stdout)])]
     const listed = [...new Set([...nul(others.stdout), ...nul(changed.stdout)].map((p) => p.replace(/^client\//, '')))]
+    const trackedC = nul(trackedClient.stdout)
+    const trackedI = nul(trackedInfra.stdout)
+    // 交付面 = 已跟踪 ∪ 未跟踪（非忽略）∪ 已改；`.github` 那一侧同名合并。这是"会进仓的东西"的全集。
+    const clientFace = [...new Set([...trackedC, ...nul(others.stdout), ...nul(changed.stdout)])]
+    const infraFace = [...new Set([...trackedI, ...nul(infra.stdout), ...nul(infraChanged.stdout)])]
     const leaked = []
     let scanned = 0
-    // 两条面用各自的家来解析：client/ 下的相对路径拼 clientRoot，`.github/` 下的拼 repoRoot。
-    const face = [...listed.map((p) => ({ disp: p, abs: join(clientRoot, p) })),
-      ...infraListed.map((p) => ({ disp: p, abs: join(repoRoot, p) }))]
+    // 交付面里的路径都是仓根相对的（`client/…`、`.github/…`），一律拼 repoRoot。
+    const face = [...clientFace, ...infraFace].map((p) => ({ disp: p, abs: join(repoRoot, p) }))
     for (const { disp, abs } of face) {
       if (!/\.(ts|tsx|mjs|cjs|js|json|md|css|html|txt|ya?ml|log|example)$/i.test(disp)) continue
       if (!existsSync(abs)) continue
@@ -484,34 +495,66 @@ check('涂色属性谓词覆盖到产品 CSS 里真在用色族成员的每一�
     // （读它就等于访问凭据）。形状必须**锚定到目录或登记文件名**——早先用裸子串，把源码文件
     // `check-live-geometry.mjs` 与 `stall-demo.mjs` 都认成了凭证文件，那两条已固化成上面的墓碑负控。
     // 正则只有顶部那一份定义：自证咬的就是扫描用的这个对象，不存在"验的判据≠跑的判据"。
-    const unignored = [...new Set([...nul(others.stdout), ...nul(changed.stdout), ...infraListed])]
-      .filter((p) => CRED_SHAPED.test(p))
+    const unignored = [...new Set([...clientFace, ...infraFace])].filter((p) => CRED_SHAPED.test(p))
     check(`凭证形状的文件全部被 .gitignore 罩着（只看路径名，未读任何内容）`, unignored.length === 0,
-      unignored.length > 0 ? `未被忽略：${unignored.slice(0, 3).join(' , ')}` : '未跟踪清单里没有任何凭证形状的路径')
-    // 正控：扫描面必须真的非空（列出 0 个文件时上面两条绿都毫无意义）。
-    check(`工作树的未跟踪/已改清单可数（client/ 面 ${listed.length} 项 + .github/ 面 ${infraListed.length} 项，client 侧 >40 才算真扫到东西）`, listed.length > 40, '')
-    check(`可提交的工作树里没有密钥形状（未跟踪+已改，实扫 ${scanned} 个文本文件）`,
-      leaked.length === 0 && scanned > 40,
-      leaked.length > 0 ? leaked.slice(0, 4).join(' | ') : '零命中；state 目录另有 .gitignore 罩着，这条查的是罩子漏了的时候')
-    // 台账交给操作者的提交清单从来不是逐文件清单，而是**目录级 pathspec**（README.md / .gitignore /
-    // package.json + apps/ packages/ scripts/）。目录级写法省事，代价是：任何**直接躺在 client/ 根下**的新文件
-    // 都不在那几条里，会被静默漏出提交——本轮实测就被我自己的一个根下探针命中过一次（91/92）。
-    // 2026-10-12 露出同族第二种：交付物整个住在 client/ **之外**（那次授权接线落下的 workflow 文件）。
-    // 面从 client/ 派生 ⇒ 清单写得再全也覆盖不到它，"提交了六个路径、CI 其实没接上"这种形状无人报红。
-    // 所以这里点名加它，条数从常量派生（不抄），README 那份清单一改这里就会红。
-    // .github 那一侧只该有 workflow，正控绑死这个已知站点（同 #119 的面自证做法）：
-    // 扫到 0 个文件时上面那条"零命中"的绿毫无意义——文件名或目录形状一改就会静默变空。
-    check(`.github 面非空且只有一个 workflow（现 ${infraListed.length} 项，多于 1 项说明有第二份制品）`,
-      infraListed.length === 1 && infraListed[0] === '.github/workflows/client-gates.yml',
-      `现测：${infraListed.join(' , ') || '空——扫描面塌了，上面那条"零命中"不作数'}`)
-    const ADD_NAMED = ['README.md', '.gitignore', 'package.json']
+      unignored.length > 0 ? `未被忽略：${unignored.slice(0, 3).join(' , ')}` : '交付面里没有任何凭证形状的路径（state / 登记 / 日志那些被罩着）')
+    // 正控：扫描面从 git 派生且不许塌。下界 150 是**当轮实测派生**的——2026-10-14 现测
+    // `git ls-files -- client` = 215 项，加上差集共 216；取七成以下算"面塌了"。
+    // 原先这里写的是 `> 40`，绑的是"整个客户端都还没提交"这个**暂时状态**：提交之后差集只剩几项，
+    // 四条判定一起红（台账早就记过这一格"干净树/CI 恒红"，今天现实追上了预言）。
+    const FACE_FLOOR = 150
+    check(`密钥/凭证扫描的交付面从 git 派生且非空（client 面 ${clientFace.length} 项 = 已跟踪 ${trackedC.length} ∪ 差集 ${listed.length}；.github 面 ${infraFace.length} 项；下界 ${FACE_FLOOR}）`,
+      clientFace.length >= FACE_FLOOR && infraFace.length >= 1,
+      clientFace.length < FACE_FLOOR ? `client 面只剩 ${clientFace.length} 项——扫描面塌了，下面那条"零命中"不作数`
+        : infraFace.length < 1 ? '.github 面是空的——那份制品不再被这条门看见' : '')
+    check(`交付面里没有密钥形状（已跟踪+未跟踪+已改，实扫 ${scanned} 个文本文件）`,
+      leaked.length === 0 && scanned >= FACE_FLOOR,
+      leaked.length > 0 ? leaked.slice(0, 4).join(' | ')
+        : scanned < FACE_FLOOR ? `只扫到 ${scanned} 个文本文件（少于下界 ${FACE_FLOOR}）——这条绿没有意义`
+          : '零命中；state 目录另有 .gitignore 罩着，这条查的是罩子漏了的时候')
+    // `.github/workflows/` 的名单正控：我们那份门禁必须在，且不许冒出第三份。面改成从交付面派生，
+    // 因为提交之后差集会**正当变空**——ci.yml 是 host 自己的，不是"第二份未跟踪制品"。
+    const WORKFLOWS_KNOWN = ['ci.yml', 'client-gates.yml']
+    const wf = infraFace.filter((p) => p.startsWith('.github/workflows/')).map((p) => p.split('/').pop()).sort()
+    const wfBad = []
+    if (!wf.includes('client-gates.yml')) wfBad.push(`我们的那份门禁 workflow 不在名单里（现测 ${wf.join(' , ') || '空'}）`)
+    for (const extra of wf.filter((n) => !WORKFLOWS_KNOWN.includes(n))) wfBad.push(`多出一份第二制品：${extra}`)
+    for (const miss of WORKFLOWS_KNOWN.filter((n) => !wf.includes(n))) wfBad.push(`已知站点没了：${miss}`)
+    check(`.github/workflows 名单恰好是已知那两份（现测 ${wf.join(' , ') || '空'}）`,
+      wfBad.length === 0 && infraFace.length >= 1,
+      infraFace.length < 1 ? '扫描面塌了（`.github` 面 0 项），上面那条"零命中"不作数'
+        : wfBad.join(' ｜ ') || `${wf.length} 份，client-gates.yml 在内`)
+    // 清单从来不是逐文件清单，而是**目录级 pathspec** 加 client/ 根下的具名文件。目录级写法省事的代价：
+    // 任何**直接躺在 client/ 根下**的新文件都不在那几条里，会被静默漏出提交（本仓被自己的根下探针命中过一次），
+    // 而交付物整个住在 client/ **之外**时（那份 workflow）连"面从 client/ 派生"这条兜底都失效——所以这里点名它。
+    const ADD_NAMED = ['README.md', 'EVIDENCE.md', '.gitignore', 'package.json']
     const ADD_DIRS = ['apps/', 'packages/', 'scripts/']
     const ADD_INFRA = ['.github/workflows/client-gates.yml']
     const PATHSPEC_N = ADD_NAMED.length + ADD_DIRS.length + ADD_INFRA.length
     const inLedgerList = (p) => ADD_NAMED.includes(p) || ADD_INFRA.includes(p) || ADD_DIRS.some((d) => p.startsWith(d))
+    // 差集（要进下次提交的东西）必须都落在那份显式清单里；面小是提交后的正常形状，不再当失败条件。
     const uncovered = [...listed, ...infraListed].filter((p) => !inLedgerList(p))
-    check(`台账的 ${PATHSPEC_N} 条 pathspec 覆盖全部改动/新文件（清单面 ${listed.length + infraListed.length} 项）`, uncovered.length === 0,
-      uncovered.length > 0 ? `不在清单里：${uncovered.slice(0, 4).join(' , ')}` : `${PATHSPEC_N} 条 pathspec 全覆盖`)
+    check(`台账那份显式清单覆盖当前差集（差集面 ${listed.length + infraListed.length} 项 / 清单 ${PATHSPEC_N} 条）`, uncovered.length === 0,
+      uncovered.length > 0 ? `不在清单里：${uncovered.slice(0, 4).join(' , ')}` : `${PATHSPEC_N} 条清单覆盖住当前 ${listed.length + infraListed.length} 项差集`)
+    // 台账里那份 `> git add …` 清单必须与门内这 ${PATHSPEC_N} 条常量**逐条双向相等**。今天补这条的理由是现成的：
+    // `client/EVIDENCE.md` 落盘后门里的名单长了，台账那句"七条 pathspec"却还写着七条——操作者照着敲就会
+    // 把它安静漏在提交之外，而原来那两条判定都看不见这种漂移（一条只看差集，一条只看自己的常量）。
+    const ledgerReadme = join(clientRoot, 'README.md')
+    const gateList = [...ADD_NAMED, ...ADD_DIRS, ...ADD_INFRA].map((p) => p.replace(/\/$/, ''))
+    const ledgerList = existsSync(ledgerReadme)
+      ? [...readFileSync(ledgerReadme, 'utf8').matchAll(/^> git add ([^\n#]+?)(?:[ \t]+#.*)?$/gm)]
+        .flatMap((m) => m[1].trim().split(/\s+/)).filter(Boolean)
+        .map((p) => p.replace(/^client\//, '').replace(/\/$/, ''))
+      : []
+    const listBad = []
+    if (!existsSync(ledgerReadme)) listBad.push('读不到台账，比对无从做起')
+    else {
+      if (ledgerList.length === 0) listBad.push('台账里认不到任何 `> git add` 行——那份清单的写法变了，这条没在量任何东西')
+      for (const extra of [...new Set(ledgerList)].filter((p) => !gateList.includes(p))) listBad.push(`台账清单里有门不认识的一条：${extra}`)
+      for (const miss of gateList.filter((g) => !ledgerList.includes(g))) listBad.push(`门认为必须进提交的那一条在台账清单里没有了：${miss}`)
+    }
+    check(`台账那份 git add 清单与门内的 pathspec 常量逐条相等（门 ${gateList.length} 条 / 台账 ${new Set(ledgerList).size} 条）`,
+      listBad.length === 0, listBad.join(' ｜ ') || `${gateList.length} 条两边一致`)
   }
 }
 

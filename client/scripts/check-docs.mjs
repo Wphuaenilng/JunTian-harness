@@ -12,7 +12,7 @@
  *      exactly these lines before spending a `mv` on shared infrastructure, so a stale claim
  *      there is a broken pipeline they have to discover by hand.
  *
- *   node scripts/check-docs.mjs            # all package + app + root READMEs
+ *   node scripts/check-docs.mjs            # all package + app + root READMEs + EVIDENCE.md
  *   node scripts/check-docs.mjs --quiet    # failures only (used by ci-smoke)
  *
  * Both checks are cheap enough to run on every CI pass, and each one has already caught a
@@ -43,6 +43,9 @@ const PATH_RE = /(?:scripts|packages|apps)\/[A-Za-z0-9_.\/-]+\.(?:tsx|mjs|ts|css
 
 // 计划正文只有一个家。此前三处判据各自 `resolve(...)` 一遍同一份路径，第四处（§1）就是第四副本——
 // 计划文件一旦改名，改漏一处的那条判定会带着「找不到文件」红，或者更糟：安静地不量任何东西。
+// §6 那份登记名册住在模块级：block 12 填它，block 18（§9 DoD 的可签规则）要复用**同一份**——
+// 复制第二份就有两处真相，正是本台账一路在反对的那种写法。
+let BOX = []
 const planDoc = resolve(clientRoot, '..', 'analysis-reports', '定稿-天枢客户端方案', '天枢Web桌面客户端自研计划-v2.0.md')
 // 定稿目录页（同一批交付物）也一样：它的文件夹路径原本只在 block 7 里定义，新的判据要读它就会写第二份。
 const finalFolder = resolve(clientRoot, '..', 'analysis-reports', '定稿-天枢客户端方案')
@@ -70,7 +73,8 @@ const CLAUSE_SHAPE = [
 ]
 
 function readmeFiles() {
-  const out = [join(clientRoot, 'README.md')]
+  // EVIDENCE.md 是从本文件搬出去的缺陷账，不在 README 枚举形状里；不点名就整块脱门。
+  const out = [join(clientRoot, 'README.md'), join(clientRoot, 'EVIDENCE.md')]
   for (const dir of [...readdirSync(join(clientRoot, 'packages')).map((d) => join('packages', d)), ...readdirSync(join(clientRoot, 'apps')).map((d) => join('apps', d))]) {
     const f = join(clientRoot, dir, 'README.md')
     if (existsSync(f)) out.push(f)
@@ -1064,10 +1068,10 @@ report(brokenTables.length === 0, 'every README table renders (row widths match 
   }
 }
 
-// 10. 「设计定稿要点」三条是定稿的**成品形状**那一半。台账为它专门写了一张「定稿设计要点逐条对账」表，
-//     但要点本身与那张表**互相都不被读**：设计稿加一枚信息架构、或台账那一行漏改，两侧都安静地绿。
-//     钉三件事——拆条的形状自证；信息架构七枚逐枚对上归属文件（登记表双向，`三态审批` 要 once/always/deny
-//     三枚齐）；七枚每枚都要在台账那张表里出现（缺哪枚 ⇒ 那张表过期，点名是哪一枚）。
+// 10. 「设计定稿要点」那三条是定稿的**成品形状**那一半。台账为它专门写了一张「定稿设计要点逐条对账」表，
+//     但要点本身与那张表**互相都不被读**：设计稿加一枚、或台账那一行漏改，两侧都安静地绿。
+//     三条要点各成一组，每组钉三件事——拆条的形状自证；该组每一枚逐枚对上归属文件（登记表双向，
+//     `三态审批` 要 once/always/deny 三枚齐）；该组每一枚都要在台账那张表里出现（缺哪枚 ⇒ 表过期，点名）。
 {
   if (!existsSync(finalReadme)) {
     report(false, '定稿 README 在盘上（设计要点判据的前提）', `找不到 ${relative(clientRoot, finalReadme)}——这一条没在量任何东西`)
@@ -1088,14 +1092,40 @@ report(brokenTables.length === 0, 'every README table renders (row widths match 
         .map((t) => t.trim().replace(/（.*$/, '').replace(/[；;。，,]$/, '').trim())
         .filter((t) => t.length > 0)
     }
-    const IA_WATCH = [
-      { piece: '项目列表', owner: 'scripts/check-live-geometry.mjs', inOwner: ['us__proj'] },
-      { piece: '最近对话', owner: 'scripts/check-live-geometry.mjs', inOwner: ['us__row'] },
-      { piece: '对话流', owner: 'packages/client-core/src/event-category.ts', inOwner: ['thinking'] },
-      { piece: '三态审批', owner: 'packages/ui-approval/src/index.tsx', inOwner: ['once', 'always', 'deny'] },
-      { piece: 'composer', owner: 'apps/web/src/App.tsx', inOwner: ['composer'] },
-      { piece: '折叠组右栏', owner: 'scripts/check-layout.mjs', inOwner: ['rail'] },
-      { piece: '底部状态条', owner: 'apps/web/src/App.tsx', inOwner: ['app__status'] },
+    // 登记表按要点分组。每组的 `ledger` 是这一枚在台账那张表里应当出现的字面量——默认等于枚名，
+    // 只有定稿写全称、台账写简称时才需要显式别名（不然是会乱配的启发式）。
+    const POINT_GROUPS = [
+      {
+        lead: '信息架构', sep: /\s*\/\s*/, min: 7,
+        note: '三态审批要求 once/always/deny 三枚齐',
+        watch: [
+          { piece: '项目列表', owner: 'scripts/check-live-geometry.mjs', inOwner: ['us__proj'] },
+          { piece: '最近对话', owner: 'scripts/check-live-geometry.mjs', inOwner: ['us__row'] },
+          { piece: '对话流', owner: 'packages/client-core/src/event-category.ts', inOwner: ['thinking'] },
+          { piece: '三态审批', owner: 'packages/ui-approval/src/index.tsx', inOwner: ['once', 'always', 'deny'] },
+          { piece: 'composer', owner: 'apps/web/src/App.tsx', inOwner: ['composer'] },
+          { piece: '折叠组右栏', owner: 'scripts/check-layout.mjs', inOwner: ['rail'] },
+          { piece: '底部状态条', owner: 'apps/web/src/App.tsx', inOwner: ['app__status'] },
+        ],
+      },
+      {
+        lead: '视觉语言', sep: /[、，]/, min: 4,
+        note: '定稿写「居中窄栏文档流」而台账那一行写简称，别名显式登记',
+        watch: [
+          { piece: 'dsh 真实 token', owner: 'scripts/check-mockup-tokens.mjs', inOwner: ['mockup'] },
+          { piece: '白底 + 蓝调灰', owner: 'packages/ui-theme/src/tokens.css', inOwner: ['--nb-', '--bg-base'] },
+          { piece: '近黑主按钮', owner: 'scripts/check-layout.mjs', inOwner: ['--nb-1000'] },
+          { piece: '居中窄栏文档流', ledger: '居中窄栏', owner: 'scripts/check-layout.mjs', inOwner: ['--measure'] },
+        ],
+      },
+      {
+        lead: '品牌只在', sep: /；/, min: 2,
+        note: '',
+        watch: [
+          { piece: '品牌只在侧栏头部一处', owner: 'scripts/check-layout.mjs', inOwner: ['us__brand'] },
+          { piece: 'SSE/AG-UI 状态收纳进底部状态条', owner: 'apps/web/src/App.tsx', inOwner: ['app__status', 'lastSeq'] },
+        ],
+      },
     ]
     const SPLIT_SHAPE = [
       { s: '信息架构：A / B / C（注） / D', sep: /\s*\/\s*/, want: ['A', 'B', 'C', 'D'] },
@@ -1109,32 +1139,8 @@ report(brokenTables.length === 0, 'every README table renders (row widths match 
       { s: '品牌只在 X；SSE/AG-UI 收纳进 Y。', sep: /；/, want: ['品牌只在 X', 'SSE/AG-UI 收纳进 Y'] },
       { s: '没有冒号的一格', sep: /\s*\/\s*/, want: ['没有冒号的一格'] },
     ]
-    const iaLine = bullet('信息架构')
-    const pieces = itemsOf(iaLine, /\s*\/\s*/)
     const badSplit = SPLIT_SHAPE.filter((c) => JSON.stringify(itemsOf(c.s, c.sep)) !== JSON.stringify(c.want))
       .map((c) => `「${c.s}」→ ${JSON.stringify(itemsOf(c.s, c.sep))}`)
-    report(badSplit.length === 0 && sec !== '' && pieces.length >= 7,
-      `定稿「信息架构」的拆条形状自证（${SPLIT_SHAPE.length} 条夹具；正文数到 ${pieces.length} 枚）`,
-      sec === '' ? '认不到「## 设计定稿要点」那一节——下面两条都没在量任何东西'
-        : badSplit.length > 0 ? `拆条器自己坏了：${badSplit.join(' ｜ ')}`
-          : pieces.length < 7 ? `正文只数到 ${pieces.length} 枚（少于 7 枚说明那一行的形状变了，绿不算数）`
-            : `七枚各认一次：${pieces.join(' , ')}`)
-
-    const watchBad = []
-    if (pieces.length !== IA_WATCH.length) watchBad.push(`正文数到 ${pieces.length} 枚 vs 登记表 ${IA_WATCH.length} 条`)
-    for (const extra of pieces.filter((x) => !IA_WATCH.some((w) => w.piece === x))) watchBad.push(`正文多出一枚「${extra}」——登记表没有它，也没人盯它`)
-    for (const w of IA_WATCH) {
-      if (!pieces.includes(w.piece)) { watchBad.push(`登记表那枚「${w.piece}」在正文信息架构里没有了`); continue }
-      const p = join(clientRoot, w.owner)
-      if (!existsSync(p)) { watchBad.push(`${w.piece} 的归属文件不在盘上：${w.owner}`); continue }
-      const body = readFileSync(p, 'utf8')
-      const miss = w.inOwner.filter((s) => !body.includes(s))
-      if (miss.length > 0) watchBad.push(`${w.piece} 的归属文件 ${w.owner} 里没有了「${miss.join('」「')}」——它还在盯这一枚吗？`)
-    }
-    report(watchBad.length === 0 && badSplit.length === 0 && pieces.length >= 7,
-      `定稿信息架构七枚逐枚对上归属文件（登记表 ${IA_WATCH.length} 条，双向；三态审批要求 once/always/deny 三枚齐）`,
-      badSplit.length > 0 ? '拆条的形状自证没过（上一条已点名），这一条的比较不作数'
-        : watchBad.join(' ｜ ') || `${pieces.length} 枚逐枚对上；归属依次是 ${IA_WATCH.map((w) => w.owner.replace(/^scripts\//, '').replace(/^packages\//, '').replace(/^apps\/web\/src\//, '')).join(' , ')}`)
 
     const ledger = readFileSync(join(clientRoot, 'README.md'), 'utf8')
     const lAt = ledger.indexOf('## 定稿「设计要点」逐条对账')
@@ -1145,16 +1151,865 @@ report(brokenTables.length === 0, 'every README table renders (row widths match 
       .filter((l) => l.trim().startsWith('|') && !/^\s*\|[-:\s|]+\|\s*$/.test(l))
       .map(splitCells)
       .filter((c) => c.length === 3 && c[0] !== '定稿要点')
-    const uncovered = pieces.filter((x) => !lRows.some((c) => c[0].includes(x)))
-    report(lAt !== -1 && badSplit.length === 0 && lRows.length >= 7 && uncovered.length === 0,
-      `台账「定稿设计要点逐条对账」那张表覆盖了信息架构的每一枚（表现 ${lRows.length} 行）`,
-      lAt === -1 ? '台账里认不到「## 定稿「设计要点」逐条对账」这一节——那张表被改名或删了'
-        : badSplit.length > 0 ? '拆条的形状自证没过（上面已点名），这一条不作数'
-          : lRows.length < 7 ? `那张表只数到 ${lRows.length} 行（少于 7 行说明表或解析坏了）`
-            : uncovered.length > 0 ? `这些要点在台账那张表里没有对应行：${uncovered.join(' , ')}` : `${pieces.length} 枚各有自己的那一行`)
+
+    for (const g of POINT_GROUPS) {
+      const line = bullet(g.lead)
+      const pieces = itemsOf(line, g.sep)
+      report(badSplit.length === 0 && sec !== '' && line !== null && pieces.length >= g.min,
+        `定稿「${g.lead}」的拆条形状自证（夹具 ${SPLIT_SHAPE.length} 条；正文数到 ${pieces.length} 枚，下界 ${g.min}）`,
+        sec === '' ? '认不到「## 设计定稿要点」那一节——本组的三条判据都没在量任何东西'
+          : badSplit.length > 0 ? `拆条器自己坏了：${badSplit.join(' ｜ ')}`
+            : line === null ? `正文里没有以「${g.lead}」开头的那一行（改名或删条了？）`
+              : pieces.length < g.min ? `正文只数到 ${pieces.length} 枚（少于 ${g.min} 枚说明那一行的形状变了，绿不算数）`
+                : `${pieces.length} 枚各认一次：${pieces.join(' , ')}`)
+
+      const watchBad = []
+      if (line === null || pieces.length !== g.watch.length) watchBad.push(`正文数到 ${pieces.length} 枚 vs 登记表 ${g.watch.length} 条`)
+      for (const extra of pieces.filter((x) => !g.watch.some((w) => w.piece === x))) watchBad.push(`正文多出一枚「${extra}」——登记表没有它，也没人盯它`)
+      for (const w of g.watch) {
+        if (!pieces.includes(w.piece)) { watchBad.push(`登记表那枚「${w.piece}」在正文里没有`); continue }
+        const p = join(clientRoot, w.owner)
+        if (!existsSync(p)) { watchBad.push(`${w.piece} 的归属文件不在盘上：${w.owner}`); continue }
+        const body = readFileSync(p, 'utf8')
+        const miss = w.inOwner.filter((s) => !body.includes(s))
+        if (miss.length > 0) watchBad.push(`${w.piece} 的归属文件 ${w.owner} 里没有了「${miss.join('」「')}」——它还在盯这一枚吗？`)
+      }
+      report(watchBad.length === 0 && badSplit.length === 0 && pieces.length >= g.min,
+        `定稿「${g.lead}」逐枚对上归属文件（登记表 ${g.watch.length} 条，双向${g.note ? '；' + g.note : ''}）`,
+        badSplit.length > 0 || line === null || pieces.length < g.min ? '上一格（拆条形状）没过，这一条的比较不作数'
+          : watchBad.join(' ｜ ') || `${pieces.length} 枚逐枚对上；归属依次是 ${g.watch.map((w) => w.owner.replace(/^scripts\//, '').replace(/^packages\//, '').replace(/^apps\/web\/src\//, '')).join(' , ')}`)
+
+      const uncovered = pieces.filter((x) => {
+        const key = g.watch.find((w) => w.piece === x)?.ledger ?? x
+        return !lRows.some((c) => c[0].includes(key))
+      })
+      report(lAt !== -1 && badSplit.length === 0 && pieces.length >= g.min && lRows.length >= 7 && uncovered.length === 0,
+        `台账「定稿设计要点逐条对账」那张表覆盖了「${g.lead}」的每一枚（表现 ${lRows.length} 行）`,
+        lAt === -1 ? '台账里认不到「## 定稿「设计要点」逐条对账」这一节——那张表被改名或删了'
+          : badSplit.length > 0 || pieces.length < g.min ? '上面拆条那一格没过，这一条不作数'
+            : lRows.length < 7 ? `那张表只数到 ${lRows.length} 行（少于 7 行说明表或解析坏了）`
+              : uncovered.length > 0 ? `这些要点在台账那张表里没有对应行：${uncovered.join(' , ')}` : `${pieces.length} 枚各有自己的那一行`)
+    }
   }
 }
 
+// 11. 「怎么跑」是给下一位读者的**入口**，而入口的两端都会漂：本仓实测过一次它只列了 15 道门禁里的
+//     11 道（读者不知道另外四扇存在），也实测过一次里面一句"七条 pathspec"与门内的八条常量各说各话。
+//     所以钉三件事：导读里点到的 `pnpm <别名>` 必须真在 package.json 里；每道 `check:*` 门禁别名都必须
+//     被导读点到一次（按别名或按它真正跑的那个脚本文件，文件名从命令串里 parse，不写死）；两边各配形状自证。
+{
+  const pkgPath = join(clientRoot, 'package.json')
+  const ledgerPath = join(clientRoot, 'README.md')
+  if (!existsSync(pkgPath) || !existsSync(ledgerPath)) {
+    report(false, 'package.json 与台账都在盘上（导读判据的前提）',
+      `${existsSync(pkgPath) ? '' : '缺 package.json '}${existsSync(ledgerPath) ? '' : '缺 README.md'}——下面三条没在量任何东西`)
+  } else {
+    const scriptsOf = (o) => Object.keys(o ?? {})
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+    const allNames = scriptsOf(pkg.scripts)
+    const gated = allNames.filter((n) => n.startsWith('check:'))
+    const txt = readFileSync(ledgerPath, 'utf8')
+    const at = txt.indexOf('## 怎么跑')
+    const rest = at === -1 ? '' : txt.slice(at)
+    const endRel = rest.indexOf('\n## ', 4)
+    const sec = endRel === -1 ? rest : rest.slice(0, endRel)
+    // 只认"整个别名"：`check:mockup` 是 `check:mockup-render` 的前缀，裸 includes 会让前者被后者顶掉。
+    const named = (needle) => {
+      const esc = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      return new RegExp(esc + '(?![-\\w])').test(sec)
+    }
+    const fileOf = (cmd) => { const m = /node +(?:\.\/)?[\w./-]*?([\w.-]+\.mjs)/.exec(String(cmd)); return m === null ? '' : m[1] }
+    const FILE_SHAPE = [
+      { v: 'node scripts/check-docs.mjs --flag', want: 'check-docs.mjs' },
+      { v: 'node ./scripts/lib/thing.mjs', want: 'thing.mjs' },
+      { v: 'node --test packages/*/test/*.test.ts', want: '' },
+    ]
+    const badFileShape = FILE_SHAPE.filter((c) => fileOf(c.v) !== c.want).map((c) => `「${c.v}」→ ${JSON.stringify(fileOf(c.v))}（应 ${JSON.stringify(c.want)}）`)
+    // pnpm 自己的子命令不是本仓别名——它们出现在导读里是正常的（`corepack pnpm install`）。
+    const BUILTIN = ['install', 'add', 'remove', 'run', 'dlx', 'exec', 'list', 'init', 'link', 'patch', 'store', 'deploy']
+    const BUILTIN_SHAPE = [
+      { s: 'corepack pnpm install', want: ['install'] },
+      { s: 'corepack pnpm check:docs --drift && pnpm test', want: ['check:docs', 'test'] },
+    ]
+    const mentionsOf = (s) => [...new Set([...s.matchAll(/pnpm +([a-zA-Z][\w:-]*)/g)].map((m) => m[1]))]
+    const badMentionShape = BUILTIN_SHAPE.filter((c) => JSON.stringify(mentionsOf(c.s)) !== JSON.stringify(c.want)).map((c) => `「${c.s}」→ ${JSON.stringify(mentionsOf(c.s))}`)
+    report(badFileShape.length === 0 && badMentionShape.length === 0,
+      `导读判据的形状自证（脚本名 ${FILE_SHAPE.length} 条 + 别名抽取 ${BUILTIN_SHAPE.length} 条：` + '带 flag 的、带 `./` 的、不是脚本的命令、一条里两个别名）',
+      [...badFileShape, ...badMentionShape].join(' ｜ ') || '四组夹具各认对一次')
+    const badAlias = mentionsOf(sec).filter((m) => !BUILTIN.includes(m) && !allNames.includes(m))
+    report(at !== -1 && badAlias.length === 0 && badFileShape.length === 0 && badMentionShape.length === 0,
+      `「怎么跑」点到的每条 pnpm 别名都真存在于 package.json（点名 ${mentionsOf(sec).length} 个，其中内建命令 ${mentionsOf(sec).filter((m) => BUILTIN.includes(m)).length} 个被正确放过）`,
+      at === -1 ? '台账里认不到「## 怎么跑」这一节——这一条没在量任何东西'
+        : badFileShape.length + badMentionShape.length > 0 ? '上面那条形状自证没过，这一条不作数'
+          : badAlias.join(' ｜ ') || '每一个点名的别名都对得上')
+    const unhung = gated.filter((g) => { const f = fileOf(pkg.scripts[g]); return !named(g) && !(f !== '' && named(f)) })
+    report(gated.length >= 12 && unhung.length === 0 && badFileShape.length === 0,
+      `每道门禁别名（package.json 里 ${gated.length} 个 check:*）都被「怎么跑」点到一次——按别名或按它真正跑的脚本文件`,
+      gated.length < 12 ? `只数到 ${gated.length} 个 check:* 别名（少于 12 个说明 package.json 或扫描坏了，这条绿不算数）`
+        : badFileShape.length > 0 ? '脚本名解析的形状自证没过（上面已点名），这一条不作数'
+          : unhung.join(' ｜ ') || `${gated.length} 道全在导读里（别名或脚本文件名各认一次）`)
+  }
+}
+
+// 12. §6 那批复选框是计划**对外的任务清单本身**。#189 已经要求 §1 阶段表里每一枚功能能在 §6 认出，
+//     但反方向此前没人钉：§6 加一条、改一条、或把某条悄悄勾成"已完成"，都没有门知道——这和 §5.2 六条坑、
+//     §7 七行风险、设计要点七枚是同一族"没人读的清单"（本仓那一族已各过一次，见 #185/#186/#192/#194）。
+//     登记表给每一条一个状态，四种之一，且**都不许静默**：
+//       done    归属文件里真放着那句实现证据；
+//       partial 只做成一部分（其余按协议不可达或宿主形态差异），除归属证据外还必须在台账里读得到那句偏差说法；
+//       parked  你已裁定的搁置/不接/后置，必须在台账里读得到那句裁定；
+//       await   还没收口（要一次真上游调用、或等你点头），必须在台账里读得到那句欠账。
+//     「没做」与「没人说它没做」是两回事——这条判据的存在理由就是这个差别。
+{
+  BOX = [
+    { m: 'M0', kw: '启动脚本固化', st: 'done', owner: 'scripts/launch-sidecar.mjs', inOwner: 'RIVET_DESKTOP_DIR', row: 'M0 #1 启动脚本固化' },
+    { m: 'M0', kw: '握手确认', st: 'done', owner: 'scripts/check-health.mjs', inOwner: 'capabilities', row: 'M0 #2 `/health` 握手' },
+    { m: 'M0', kw: '单 HTML 页直连', st: 'done', owner: 'apps/spike/index.html', inOwner: 'getReader', row: 'M0 #3 单页直连 SSE 收发消息' },
+    { m: 'M0', kw: '浏览器看到流式', st: 'done', owner: 'apps/spike/index.html', inOwner: 'turn_complete', row: 'M0 #4 验收（浏览器见流式 delta）' },
+    { m: 'M1', kw: 'REST + SSE', st: 'done', owner: 'packages/client-core/src/event-category.ts', inOwner: 'text_delta', row: 'M1 `client-core`' },
+    { m: 'M1', kw: '会话列表', st: 'done', owner: 'packages/client-core/src/sidecar-client.ts', inOwner: 'archiveSession', row: 'M1 `ui-session` / `ui-chat` / `ui-approval`' },
+    { m: 'M1', kw: 'PartialAccumulator', st: 'done', owner: 'packages/client-core/src/session-model.ts', inOwner: 'PartialAccumulator', row: 'M1 `ui-session` / `ui-chat` / `ui-approval`' },
+    { m: 'M1', kw: '三态面板', st: 'done', owner: 'packages/ui-approval/src/answer.ts', inOwner: 'always', row: 'M1 `ui-session` / `ui-chat` / `ui-approval`' },
+    { m: 'M1', kw: '中止', st: 'done', owner: 'packages/client-core/src/sidecar-client.ts', inOwner: 'abort(id: string)', row: 'M1 `/abort`、错误条、`status` 展示' },
+    // 这一格是**活过一次**，不是常驻制品：2026-10-10 经你授权拿真上游端到端跑过（台账「§9 MVP 活流端到端」那行
+    // 记着 53 条事件账与 4 发上游请求的花费）。#195 初版把它登记成 await 是**我自己读错了自己写的交接**，
+    // 2026-10-14 反着从现实的表里量出来才发现（见「里程碑状态 ↔ 登记表」那条判定）。
+    { m: 'M1', kw: '完整跑通', st: 'once', say: '真打了一发上游', row: '§9 MVP 活流端到端' },
+    { m: 'M2', kw: '历史向上分页', st: 'done', owner: 'packages/client-core/src/sidecar-client.ts', inOwner: 'historyPage', row: 'M2 历史向上分页（冷通道）' },
+    { m: 'M2', kw: '流式 diff', st: 'partial', owner: 'packages/client-core/src/tool-file.ts', inOwner: 'uiContent', sayFile: 'EVIDENCE.md', say: '行进度', row: 'M2 流式 diff 三件套' },
+    { m: 'M2', kw: '影子 checkpoint', st: 'done', owner: 'packages/client-core/src/sidecar-client.ts', inOwner: 'rewindPoints', row: 'M2 影子检查点面板（`ui-git`）' },
+    { m: 'M2', kw: '会话搜索', st: 'partial', owner: 'packages/client-core/src/sidecar-client.ts', inOwner: 'searchSessions', say: '根与布局两处都不一致', row: 'M2 会话搜索' },
+    { m: 'M2', kw: 'Git 工作台', st: 'done', owner: 'packages/client-core/src/sidecar-client.ts', inOwner: 'sessionOpenPr', row: 'M2 Git 工作台（读路径）' },
+    { m: 'M2', kw: '设置中心', st: 'done', owner: 'scripts/accept-settings.ts', inOwner: '/config', row: 'M2 设置中心（`ui-settings`）' },
+    { m: 'M2', kw: '定时任务看板', st: 'done', owner: 'packages/client-core/src/sidecar-client.ts', inOwner: 'listScheduledTasks', row: 'M2 定时任务看板（`ui-schedule`）' },
+    { m: 'M2', kw: 'Cockpit 快照条', st: 'done', owner: 'packages/client-core/src/sidecar-client.ts', inOwner: 'cockpit(id: string)', row: 'M2 Cockpit 快照条' },
+    { m: 'M2', kw: 'MCP Apps', st: 'done', owner: 'packages/ui-primitives/src/app-frame.ts', inOwner: 'postMessage', row: 'M2 明暗主题 × MCP Apps 的接缝' },
+    { m: 'M2', kw: 'i18n 双语', st: 'done', owner: 'packages/ui-theme/src/index.ts', inOwner: 'data-theme', row: 'M2 i18n 双语（`@tianshu/locale`）' },
+    { m: 'M3', kw: 'Electron 壳', st: 'done', owner: 'apps/desktop/src/main.mjs', inOwner: 'requestSingleInstanceLock' },
+    { m: 'M3', kw: 'electron-builder', st: 'parked', say: '两项搁置' },
+    { m: 'M3', kw: 'AG-UI 适配端点', st: 'partial', owner: 'packages/client-core/src/ag-ui.ts', inOwner: 'text_delta', say: '是搁置不是完成', row: 'M3 AG-UI 适配端点' },
+    { m: 'M3', kw: 'E4 客户端工具委托', st: 'parked', say: 'E4 你已定不接' },
+    { m: 'M3', kw: 'ACP 适配层', st: 'parked', owner: 'scripts/check-nongoals.mjs', inOwner: 'ACP', say: '后置为独立项目' },
+  ]
+  const THREAD = [
+    { kw: '协议漂移监控', owner: 'scripts/ci-smoke.mjs', inOwner: 'drift' },
+    { kw: '协议消费台账', owner: 'scripts/protocol-ledger.mjs', inOwner: '事件' },
+  ]
+  // 复选框行的真实写法有四种要各认一次：带括号注与斜杠、带粗体与冒号、以「（可选，独立项目）」开头、
+  // 已勾选那一枚（正文里现在没有，但解析器必须认得——否则"被人勾掉"这一类永远看不见）。
+  const boxOf = (l) => {
+    const m = /^- \[([ xX])\] (\S.*)$/.exec(l)
+    return m === null ? null : { tick: m[1], text: m[2] }
+  }
+  const BOX_SHAPE = [
+    { s: '- [ ] 启动脚本固化（随机端口/token + `RIVET_DESKTOP_DIR` 隔离 + CORS 开发开关）；', tick: ' ', head: '启动脚本固化' },
+    { s: '- [ ] **流式 diff**（Cline 三件套思路：改前视图 + 增量写入 + 行进度装饰）；', tick: ' ', head: '**流式 diff**' },
+    { s: '- [ ] （可选，独立项目）ACP 适配层，面向 Zed/JetBrains 分发——**做就做完整版**。', tick: ' ', head: '（可选，独立项目）ACP' },
+    { s: '- [x] 已经勾掉的一条。', tick: 'x', head: '已经勾掉的一条。' },
+    { s: '- 协议漂移监控 CI：类型镜像 diff + 冒烟；', tick: null, head: null },
+    { s: '  - [ ] 缩进里的子项（§6 现在没有；有了要连登记面一起改）', tick: null, head: null },
+  ]
+  const badBoxShape = BOX_SHAPE.filter((c) => {
+    const g = boxOf(c.s)
+    if (c.tick === null) return g !== null
+    return g === null || g.tick !== c.tick || !g.text.startsWith(c.head)
+  }).map((c) => `「${c.s.slice(0, 24)}…」→ ${JSON.stringify(boxOf(c.s))}`)
+  report(badBoxShape.length === 0,
+    `§6 复选框解析的形状自证（${BOX_SHAPE.length} 条夹具：括号注、粗体冒号、以「（可选）」开头、已勾选那枚、两种不该算的行）`,
+    badBoxShape.join(' ｜ ') || '六条夹具各认对一次（普通条目与缩进子项都没被当成复选框）')
+
+  if (!existsSync(planDoc)) {
+    report(false, '计划正文在盘上（§6 判据的前提）', `找不到 ${relative(clientRoot, planDoc)}——这一条没在量任何东西`)
+  } else {
+    const plan = readFileSync(planDoc, 'utf8')
+    const at6 = plan.indexOf('## 6. 里程碑与任务分解')
+    const rest6 = at6 === -1 ? '' : plan.slice(at6)
+    const to7 = rest6.indexOf('\n## 7.')
+    const s6 = to7 === -1 ? rest6 : rest6.slice(0, to7)
+    const secOf = (prefix) => {
+      const a = s6.indexOf('### ' + prefix)
+      if (a === -1) return null
+      const r = s6.slice(a)
+      const n = r.indexOf('\n### ', 4)
+      return n === -1 ? r : r.slice(0, n)
+    }
+    const ms = ['M0', 'M1', 'M2', 'M3']
+    const derived = new Map(ms.map((k) => {
+      const sec = secOf(k + ' ')
+      const lines = sec === null ? [] : sec.split('\n').map(boxOf).filter((b) => b !== null)
+      return [k, lines]
+    }))
+    const derivedTotal = [...derived.values()].reduce((n, v) => n + v.length, 0)
+    const ticked = [...derived.values()].flat().filter((b) => b.tick !== ' ')
+    const bad = []
+    if (s6 === '') bad.push('正文里认不到「## 6. 里程碑与任务分解」这一节')
+    if (derivedTotal < 20) bad.push(`只数到 ${derivedTotal} 条复选框（少于 20 条说明拆面坏了，这条绿不算数）`)
+    for (const k of ms) if (secOf(k + ' ') === null) bad.push(`认不到里程碑标题「### ${k}」`)
+    for (const k of ms) {
+      const rows = derived.get(k) ?? []
+      const want = BOX.filter((w) => w.m === k)
+      if (rows.length !== want.length) bad.push(`${k} 正文 ${rows.length} 条 vs 登记表 ${want.length} 条——加一条任务要连登记表一起加`)
+      for (const w of want) {
+        const hits = rows.filter((r) => r.text.includes(w.kw))
+        if (hits.length === 0) bad.push(`${k} 登记表那条「${w.kw}」在正文里认不出——被改名还是被删了？`)
+        if (hits.length > 1) bad.push(`${k} 那条的关键词「${w.kw}」命中 ${hits.length} 行，认不准是谁（关键词要唯一）`)
+      }
+      for (const r of rows) if (!want.some((w) => r.text.includes(w.kw))) bad.push(`${k} 正文多出一条「${r.text.slice(0, 28)}…」——登记表没有它，也就没人执行它`)
+    }
+    if (ticked.length > 0) bad.push(`正文里有 ${ticked.length} 条被勾成已完成（${ticked.map((b) => b.text.slice(0, 20)).join(' , ')}）——本仓的进度住在台账，要勾得连这条规矩一起改`)
+    report(bad.length === 0 && badBoxShape.length === 0 && s6 !== '',
+      `§6 的复选框与登记表逐里程碑双向相等（登记表 ${BOX.length} 条 = ${ms.map((k) => `${k}:${(derived.get(k) ?? []).length}`).join(' / ')}），且正文一条都不许勾`,
+      badBoxShape.length > 0 ? '复选框解析的形状自证没过（上一条已点名），这一条的比较不作数'
+        : s6 === '' ? '认不到 §6 那一节，这一条没在量任何东西'
+          : bad.join(' ｜ ') || `${derivedTotal} 条逐条认一次，正文未被勾选`)
+
+    const stBad = []
+    const sayFileOf = (w) => w.sayFile ?? 'README.md'
+    const ledgerCache = new Map()
+    const ledgerOf = (name) => {
+      if (!ledgerCache.has(name)) {
+        const p = join(clientRoot, name)
+        ledgerCache.set(name, existsSync(p) ? readFileSync(p, 'utf8') : '')
+      }
+      return ledgerCache.get(name)
+    }
+    for (const w of BOX) {
+      if (w.owner !== undefined) {
+        const p = join(clientRoot, w.owner)
+        if (!existsSync(p)) { stBad.push(`${w.kw} 的归属文件不在盘上：${w.owner}`); continue }
+        if (!readFileSync(p, 'utf8').includes(w.inOwner)) stBad.push(`${w.kw} 的归属文件 ${w.owner} 里没有了「${w.inOwner}」——它还在做这一条吗？`)
+      }
+      if (w.st !== 'done') {
+        if (w.say === undefined) { stBad.push(`${w.kw} 登记成 ${w.st} 却没写要在台账读到哪句话`); continue }
+        const body = ledgerOf(sayFileOf(w))
+        if (body === '') stBad.push(`${w.kw} 要读的那份台账不在盘上：${sayFileOf(w)}`)
+        else if (!body.includes(w.say)) stBad.push(`${w.kw}（${w.st}）在 ${sayFileOf(w)} 里读不到「${w.say}」——裁定或欠账的说法没了，这条就成了静默的"没做"`)
+      }
+    }
+    const bySt = (k) => BOX.filter((w) => w.st === k).length
+    report(stBad.length === 0 && badBoxShape.length === 0 && s6 !== '' && ledgerOf('EVIDENCE.md') !== '',
+      `§6 每条的状态都有出处（${[...new Set(BOX.map((w) => w.st))].map((k) => `${k} ${bySt(k)}`).join(' / ')}，合计 ${BOX.length}；非 done 一律要求在台账里读得到那句话）`,
+      s6 === '' ? '上一格已点名认不到 §6，这一条不作数'
+        : badBoxShape.length > 0 ? '形状自证没过（上面已点名），这一条不作数'
+          : ledgerOf('EVIDENCE.md') === '' ? 'EVIDENCE.md 不在盘上——partial 那格没有可读的第二份台账'
+            : stBad.join(' ｜ ')
+              || `${BOX.length} 条状态各对上：归属文件 ${BOX.filter((w) => w.owner !== undefined).length} 处有证据、非 done ${BOX.length - bySt('done')} 条各有裁定或欠账说法`)
+
+    // 「里程碑状态（实测，非计划复述）」那张表与上面这份登记表**以前互不相认**：表里写 ✅ 而登记表写 partial
+    // （或反过来）时两侧都照绿——这正是 #109 记过的"台账两行互打脸，没有门能抓"。落这条判定当场量出两处：
+    //   ① M1「完整跑通」被我登记成 await，而表里那行的证据列写着 2026-10-10 经你授权拿真上游端到端跑过
+    //     （53 条事件账 + 4 发上游请求的花费）——**是我读错了自己写的交接**，登记表改成 `once`（活过一次，
+    //     不是常驻制品）；② 表里「M2 流式 diff 三件套」写 ✅，而登记表与 EVIDENCE 都判"两件半、第三件按协议
+    //     不可达"——表的判定列过报，已改成 ⚠。别名只覆盖能对上的那些行；没别名的行不在这条射程里（如实打印）。
+    const VERDICT = { done: '✅', once: '✅', partial: '⚠', parked: '⏸' }
+    const ledgerNow = ledgerOf('README.md')
+    const tAt = ledgerNow.indexOf('## 里程碑状态')
+    const tRest = tAt === -1 ? '' : ledgerNow.slice(tAt)
+    const tEnd = tRest.indexOf('\n## ', 4)
+    const tSec = tEnd === -1 ? '' : tRest.slice(0, tEnd)
+    const tRows = tSec.split('\n')
+      .filter((l) => l.trim().startsWith('|') && !/^\s*\|[-:\s|]+\|\s*$/.test(l))
+      .map(splitCells).filter((c) => c.length === 3 && c[0] !== '计划项')
+    const aliased = BOX.filter((w) => w.row !== undefined)
+    const vBad = []
+    if (tAt === -1) vBad.push('台账里认不到「## 里程碑状态」那一节——别名一条都没在被比')
+    if (tRows.length < 30) vBad.push(`那张表只数到 ${tRows.length} 行（少于 30 行说明拆表坏了，比较不作数）`)
+    // 等号棘轮（与产品 CSS 颜色字面量那枚同一种做法）：别名条数必须**等于**登记的那个数。
+    // 只设下界拦不住"悄悄少钉一条"——变异 Y3 实测：删掉一条别名，下界 15 照绿。要缩小覆盖就得当面改这里。
+    const ALIAS_RATCHET = 21
+    if (aliased.length !== ALIAS_RATCHET) vBad.push(`带表内别名的登记是 ${aliased.length} 条，而棘轮钉在 ${ALIAS_RATCHET} 条——多钉要一起改这个数，少钉必须当着门说明为什么不再比那一行`)
+    for (const w of aliased) {
+      const hits = tRows.filter((c) => c[0].startsWith(w.row))
+      if (hits.length !== 1) { vBad.push(`别名「${w.row}」在表里命中 ${hits.length} 行（要恰好一行）`); continue }
+      const cell = hits[0][1]
+      const want = VERDICT[w.st]
+      if (w.st === 'parked' ? /^✅/.test(cell) : !cell.startsWith(want)) vBad.push(`「${w.kw}」登记为 ${w.st}，表里那一行却写「${cell.slice(0, 26)}」`)
+    }
+    const uncoveredRows = tRows.filter((c) => !aliased.some((w) => c[0].startsWith(w.row)))
+    report(vBad.length === 0 && stBad.length === 0 && tAt !== -1 && tRows.length >= 30 && aliased.length === ALIAS_RATCHET,
+      `登记表 ↔「里程碑状态」那张表的判定列逐条相容（别名棘轮 ${ALIAS_RATCHET} 条；done/once 要 ✅、partial 要 ⚠、parked 不得写 ✅）`,
+      tAt === -1 ? '认不到那一节，这一条没在量任何东西'
+        : tRows.length < 30 || aliased.length !== ALIAS_RATCHET ? `面塌了（表 ${tRows.length} 行 / 别名 ${aliased.length} 条 ≠ 棘轮 ${ALIAS_RATCHET}）——上面的比较不作数`
+          : vBad.join(' ｜ ')
+            || `${aliased.length} 条逐条相容；那张表另有 ${uncoveredRows.length} 行没有别名（那条不在本判据射程，包括历史条目与新增格）`)
+
+    // 已裁定的事不许在那张表里被写成待决。#162 给 CI 名册钉过同一族（名册把已跑绿的 AA 门写成"故意红不接"），
+    // 那条只盖到名册；这条把面放到状态表正文。只扫这一节是有意的：别处的历史快照段里"当年是 9 对不过"是**如实**，
+    // 全文禁它就是把日期标注的读数当成谎报来删。命中数由短语表派生，加一条裁定就加一枚短语。
+    const CLOSED_BANNED = ['AA 等你定', '故意红，不接']
+    const BAN_SHAPE = [
+      { s: '浅色对比度 9 对不过 AA 等你定（#29）', want: 1 },
+      { s: '这一行没有那些字', want: 0 },
+      { s: 'AA 配色门仍是故意红，不接 CI', want: 1 },
+    ]
+    const hitsOf = (text) => CLOSED_BANNED.filter((p) => text.includes(p)).length
+    const badBanShape = BAN_SHAPE.filter((c) => hitsOf(c.s) !== c.want)
+      .map((c) => `「${c.s.slice(0, 20)}…」命中 ${hitsOf(c.s)} 次，应为 ${c.want}`)
+    report(badBanShape.length === 0 && tAt !== -1,
+      `裁定闭合说法的形状自证（${BAN_SHAPE.length} 条夹具 × ${CLOSED_BANNED.length} 枚禁句：命中数各对一次）`,
+      badBanShape.join(' ｜ ') || (tAt === -1 ? '上一格已点名认不到那一节' : `${CLOSED_BANNED.length} 枚禁句在三条夹具上各命中对的一次`))
+    const staleInTable = CLOSED_BANNED.filter((p) => tSec.includes(p))
+    report(badBanShape.length === 0 && staleInTable.length === 0 && tAt !== -1,
+      `「里程碑状态」那张表里没有把已裁定的事写成待决（禁句 ${CLOSED_BANNED.length} 枚，逐枚点名）`,
+      tAt === -1 ? '认不到那一节，这一条没在量任何东西'
+        : badBanShape.length > 0 ? '形状自证没过（上一条已点名），这一条不作数'
+          : staleInTable.join(' ｜ ') || `那张表 ${tRows.length} 行的正文里，${CLOSED_BANNED.length} 枚禁句一条都没出现`)
+
+    const thBad = []
+    const thSecIdx = s6.indexOf('### 贯穿项')
+    const thSec = thSecIdx === -1 ? '' : s6.slice(thSecIdx)
+    const thLines = thSec.split('\n').filter((l) => /^- \S/.test(l))
+    if (thSecIdx === -1) thBad.push('§6 里认不到「### 贯穿项」那一节')
+    if (thLines.length < THREAD.length) thBad.push(`那一节只有 ${thLines.length} 条条目（少于登记表 ${THREAD.length} 条，拆面坏了）`)
+    for (const w of THREAD) {
+      if (!thSec.includes(w.kw)) { thBad.push(`贯穿项那条「${w.kw}」在正文里认不出`); continue }
+      const p = join(clientRoot, w.owner)
+      if (!existsSync(p)) { thBad.push(`贯穿项「${w.kw}」的归属文件不在盘上：${w.owner}`); continue }
+      if (!readFileSync(p, 'utf8').includes(w.inOwner)) thBad.push(`贯穿项「${w.kw}」的归属文件 ${w.owner} 里没有了「${w.inOwner}」——它还在盯这件事吗？`)
+    }
+    for (const l of thLines) if (!THREAD.some((w) => l.includes(w.kw))) thBad.push(`贯穿项正文多出一条「${l.slice(2, 26)}…」——登记表没有它`)
+    report(thBad.length === 0 && thSecIdx !== -1,
+      `§6 贯穿项那 ${THREAD.length} 条各有一件常驻制品（漂移冒烟 + 协议消费台账），双向不多不少`,
+      thSecIdx === -1 ? '认不到「### 贯穿项」，这一条没在量任何东西' : thBad.join(' ｜ ')
+        || `${thLines.length} 条各认一次；制品依次是 ${THREAD.map((w) => w.owner.replace(/^scripts\//, '')).join(' , ')}`)
+  }
+}
+
+// 13. §2「行业调研结论」是最后一节还没有判据读过的（§1、§2.3、§4–§9、附 与定稿 README 都已逐行钉回）。
+//     它开头那句自述里有两个数（几个项目、几个协议标准）加一条「几条核心判断」，两侧各有真文件撑着：
+//     架构调研报告与协议调研报告都在 `analysis-reports/` 下，逐条 `## N.` 小节。此前 #181 只验过索引里那些
+//     路径**存在**，没验过那句自述的**枚数与名单**——一句"调研了 9 个项目"如果名单里只有 8 枚、或报告里
+//     只有 8 条项目小节，那三个数就没人对过。判据把三方（那句、名单、报告小节）互相钉住：
+//       ① 抽取谓词的形状自证（含合写那一枚按 `/` 拆、`等` 收尾、汉字数词三种真实写法）；
+//       ② 那句点到的每一枚名字都要在对应报告里认到一条 `^## N.` 小节标题；报告里认不出的小节必须逐条
+//          登记在"收尾节"名单里（多一条没登记 ⇒ 红；名单里那条没了 ⇒ 红，双向）；
+//       ③ 三个自述数全部现派生：项目枚数＝名单按 `/` 拆开后的总数、标准枚数＝名单枚数、判断数＝§2 的小节数。
+//     ③ 落下来就把一处含糊暴露出来了：那句写「9 个项目」，报告实有 **8** 条编号项目小节——只有把
+//     `Cline/Roo Code` 这条合写算成两个代码库才凑得满 9。判据因此**钉的是拆法**（拆完相等），
+//     并把不拆那一眼（8 条小节）一起打印出来，免得下次有人把它读成"报告里该有 9 条"。
+{
+  const reportsDir = resolve(clientRoot, '..', 'analysis-reports')
+  const ARCH = '2026-10-09-开源Agent客户端架构调研.md'
+  const PROTO = '2026-10-09-agent-client-protocols.md'
+  const CN = { 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 }
+  // 一句里形如「N 个<描述>（A、B/C、D 等）」的枚举，可出现多次。
+  const listsOf = (line) => {
+    const out = []
+    const re = /(\d+) 个((?:(?!（)[^\n]){0,24})（([^）]*)）/g
+    let m
+    while ((m = re.exec(line)) !== null) {
+      const raw = m[3].split('、').map((t) => t.trim().replace(/ ?等$/, '').trim()).filter((t) => t.length > 0)
+      out.push({ stated: Number(m[1]), kind: m[2].trim(), items: raw, split: raw.flatMap((t) => t.split('/').map((x) => x.trim()).filter((x) => x.length > 0)) })
+    }
+    return out
+  }
+  const clausesOf = (line) => { const m = /([一二两三四五六七八九十]|\d+)\s*条核心判断/.exec(line); return m === null ? null : /^\d+$/.test(m[1]) ? Number(m[1]) : CN[m[1]] ?? null }
+  const LIST_SHAPE = [
+    { s: '调研了 9 个开源 Agent 项目（OpenCode、Cline/Roo Code、Crush 等）与 5 个协议标准（ACP、ChatKit）。四条核心判断：', want: [9, 5], wantSplit: [4, 2], wantClause: 4 },
+    { s: '调研了 2 个项目（A、B）与 1 个标准（C）。两条核心判断：', want: [2, 1], wantSplit: [2, 1], wantClause: 2 },
+    { s: '没有枚举也没有条数的一句。', want: [], wantSplit: [], wantClause: null },
+  ]
+  const badListShape = LIST_SHAPE.filter((c) => {
+    const g = listsOf(c.s)
+    return JSON.stringify(g.map((x) => x.stated)) !== JSON.stringify(c.want)
+      || JSON.stringify(g.map((x) => x.split.length)) !== JSON.stringify(c.wantSplit)
+      || clausesOf(c.s) !== c.wantClause
+  }).map((c) => {
+    const g = listsOf(c.s)
+    return `「${c.s.slice(0, 20)}…」→ 数 ${JSON.stringify(g.map((x) => x.stated))} 枚 ${JSON.stringify(g.map((x) => x.split.length))} 条数 ${JSON.stringify(clausesOf(c.s))}`
+  })
+  report(badListShape.length === 0,
+    `§2 那句的抽取形状自证（${LIST_SHAPE.length} 条夹具：合写按 / 拆、` + '`等` 收尾、两个枚举并存、汉字数词两种写法（二/两）、什么都没抽到的一句）',
+    badListShape.join(' ｜ ') || '三组夹具各抽对一次（合写那一枚拆成两枚、`等` 没被当成一枚名字）')
+
+  if (!existsSync(planDoc) || !existsSync(join(reportsDir, ARCH)) || !existsSync(join(reportsDir, PROTO))) {
+    report(false, '§2 判据的三份前提都在盘上（计划正文 + 两份调研报告）',
+      [planDoc, join(reportsDir, ARCH), join(reportsDir, PROTO)].filter((p) => !existsSync(p)).map((p) => relative(clientRoot, p)).join(' ｜ ') || '未知缺失')
+  } else {
+    const plan = readFileSync(planDoc, 'utf8')
+    const a2 = plan.indexOf('## 2. 行业调研结论')
+    const r2 = a2 === -1 ? '' : plan.slice(a2)
+    const e2 = r2.indexOf('\n---')
+    const s2 = e2 === -1 ? r2.slice(0, 4000) : r2.slice(0, e2)
+    const claimLine = s2.split('\n').find((l) => l.startsWith('调研了')) ?? ''
+    const lists = listsOf(claimLine)
+    const heads = (name) => readFileSync(join(reportsDir, name), 'utf8').split('\n').filter((l) => /^## \d+\. /.test(l))
+    const archH = heads(ARCH)
+    const protoH = heads(PROTO)
+    const subCount = (s2.match(/^### 2\.\d/gm) ?? []).length
+    const TAIL = [
+      { file: ARCH, kw: '其他有特色的项目', why: '简评段，不是逐项目拆解' },
+      { file: ARCH, kw: '对天枢自研', why: '结论建议段' },
+      { file: PROTO, kw: 'TL;DR', why: '摘要' },
+      { file: PROTO, kw: '其他标准简评', why: '不入选的分节' },
+      { file: PROTO, kw: '横向对比速查表', why: '表格' },
+      { file: PROTO, kw: '协议选型建议', why: '结论' },
+    ]
+    const bad = []
+    if (claimLine === '') bad.push('§2 里认不到以「调研了」开头的那句自述')
+    if (lists.length !== 2) bad.push(`那句只抽到 ${lists.length} 个枚举（应是两个：项目与协议标准）——句式变了要连抽取器一起改`)
+    const proj = lists[0]
+    const proto = lists[1]
+    if (archH.length < 8) bad.push(`架构调研只数到 ${archH.length} 条编号小节（少于 8 条说明报告被截过或读错文件，下面的比较不作数）`)
+    if (protoH.length < 5) bad.push(`协议调研只数到 ${protoH.length} 条编号小节（少于 5 条同上）`)
+    const faces = [[proj, archH, ARCH], [proto, protoH, PROTO]]
+    for (const [w, hs, file] of faces) {
+      if (w === undefined || hs.length < 1) continue
+      for (const name of w.split) {
+        const hit = hs.filter((h) => h.includes(name))
+        if (hit.length === 0) bad.push(`${file} 里认不到那句点到的「${name}」对应的小节标题`)
+        if (hit.length > 1) bad.push(`「${name}」在 ${file} 里命中 ${hit.length} 条编号小节标题，认不准是哪一条`)
+      }
+      for (const h of hs) {
+        if (w.split.some((name) => h.includes(name))) continue
+        const t = TAIL.filter((x) => x.file === file && h.includes(x.kw))
+        if (t.length === 0) bad.push(`${file} 有条小节「${h.slice(3, 26)}…」既没被那句点到、也没登记在收尾名单里`)
+        if (t.length > 1) bad.push(`${file} 那条「${h.slice(3, 20)}…」被收尾名单里的 ${t.length} 条同时认领（名单要互斥）`)
+      }
+    }
+    for (const t of TAIL) {
+      const hs = t.file === ARCH ? archH : protoH
+      if (!hs.some((h) => h.includes(t.kw))) bad.push(`收尾名单里那条「${t.kw}」（${t.file}）在报告里已经认不出——名单过期了`)
+      if (typeof t.why !== 'string' || t.why.trim() === '') bad.push(`收尾那条「${t.kw}」没写理由——登记型豁免必须说明它凭什么算收尾节（与孤儿脚本那张理由表同一把尺子）`)
+    }
+    report(bad.length === 0 && badListShape.length === 0 && claimLine !== '' && lists.length === 2,
+      `§2 那句点到的每一枚名字都在调研报告里认到一条编号小节，报告里多出来的小节要么被点到、要么登记为收尾节（双向；收尾每条带理由）`,
+      badListShape.length > 0 ? '抽取的形状自证没过（上一条已点名），这一条不作数'
+        : claimLine === '' ? '§2 里没有以「调研了」开头的那句，这一条没在量任何东西'
+          : bad.join(' ｜ ') || `两份报告的编号小节 ${archH.length} + ${protoH.length} 条逐条归类；收尾 ${TAIL.length} 条的理由依次是 ${TAIL.map((t) => `${t.kw}=${t.why}`).join(' , ')}`)
+
+    const numBad = []
+    if (proj !== undefined && proj.stated !== proj.split.length) numBad.push(`那句写 ${proj.stated} 个项目、名单拆开是 ${proj.split.length} 枚（不拆是 ${proj.items.length} 枚——差在合写那条）`)
+    if (proto !== undefined && proto.stated !== proto.split.length) numBad.push(`那句写 ${proto.stated} 个协议标准、名单是 ${proto.split.length} 枚`)
+    const wantClause = clausesOf(claimLine)
+    if (wantClause === null) numBad.push('那句里没有「N 条核心判断」')
+    else if (wantClause !== subCount) numBad.push(`那句写 ${wantClause} 条核心判断、§2 实有 ${subCount} 个小节`)
+    report(numBad.length === 0 && bad.length === 0 && lists.length === 2,
+      `§2 那句自述的三个数全部现派生（项目＝名单拆合写后的枚数、标准＝名单枚数、判断＝§2 小节数），不相等就红`,
+      lists.length !== 2 || bad.length > 0 ? '上面那条逐名对账没过（已点名），这一条不作数'
+        : numBad.join(' ｜ ')
+          || `项目 ${proj.stated} 枚（报告 ${archH.length} 条编号小节里 ${archH.length - TAIL.filter((t) => t.file === ARCH).length} 条是逐项目拆解，合写那条拆成两枚才满 ${proj.stated}） / 标准 ${proto.stated} 枚 / 判断 ${subCount} 小节`)
+  }
+}
+
+// 14. §3「协议选型定案」是这份计划最后一节还没被读过的正文（§1、§2、§4–§9、附 与定稿 README 都已逐行钉回）。
+//     它给的是一份**选型定案**：那个框图（唯一通道 / 事件数 / 五类 / 类型层）+ 四条 bullet。每一条今天都
+//     有别的门在 Enforcement，但没有一条被**逐名登记**过——所以"计划改了说法而钉它的门没改"这种漂移看不见
+//     （§7 那张风险表、§5.2 那六条坑、§6 那 25 条复选框各撞过这一族）。另有一枚**旧数**：框图写
+//     「44 种 sidecar 事件」，而类型镜像现测 `eventTypeCount` 是另一个数——那条纠正必须读得到，不然正文那个
+//     44 就永远是一块没人管的假事实。
+{
+  if (!existsSync(planDoc)) {
+    report(false, '计划正文在盘上（§3 判据的前提）', `找不到 ${relative(clientRoot, planDoc)}——这一条没在量任何东西`)
+  } else {
+    const plan = readFileSync(planDoc, 'utf8')
+    const a3 = plan.indexOf('## 3. 协议选型定案')
+    const r3 = a3 === -1 ? '' : plan.slice(a3)
+    const e3 = r3.indexOf('\n---')
+    const s3 = e3 === -1 ? '' : r3.slice(0, e3)
+    const ba = s3.indexOf('```')
+    const bb = s3.indexOf('```', ba + 3)
+    const box = ba === -1 || bb === -1 ? '' : s3.slice(ba + 3, bb)
+    const BOX_SHAPE = [
+      { s: '│  事件层：44 种 sidecar 事件                    │', kind: 'num', want: 44 },
+      { s: '│      lifecycle / text / tool / state / custom │', kind: 'cats', want: ['lifecycle', 'text', 'tool', 'state', 'custom'] },
+      { s: '│  传输层：天枢 sidecar REST + SSE（唯一通道）    │', kind: 'cats', want: [] },
+      { s: '└───────────────────────────────────────────────┘', kind: 'num', want: null },
+    ]
+    const numOf = (line) => { const m = /事件层：(\d+) 种/.exec(line); return m === null ? null : Number(m[1]) }
+    const catsOf = (line) => {
+      const body = line.replace(/^│/, '').replace(/│$/, '').trim()
+      if (!body.includes('lifecycle')) return []
+      return body.split('/').map((t) => t.trim()).filter((t) => /^[a-z-]+$/.test(t))
+    }
+    const badBoxShape = BOX_SHAPE.filter((c) => {
+      const g = c.kind === 'num' ? numOf(c.s) : catsOf(c.s)
+      return JSON.stringify(g) !== JSON.stringify(c.want)
+    }).map((c) => `「${c.s.slice(0, 22)}…」→ ${JSON.stringify(c.kind === 'num' ? numOf(c.s) : catsOf(c.s))}`)
+    report(badBoxShape.length === 0,
+      `§3 那个框图的拆行形状自证（${BOX_SHAPE.length} 条：取数那行、五类那行、含斜杠但不是五类的一行、什么都不该取到的一行）`,
+      badBoxShape.join(' ｜ ') || '四条夹具各拆对一次（`REST + SSE` 那行没被误认成五类，制表符那行没被当成取数行）')
+
+    const CAT_WATCH = ['lifecycle', 'text', 'tool', 'state', 'custom']
+    const BULLET_WATCH = [
+      { kw: '传输绑定私有协议', owner: 'scripts/check-nongoals.mjs', inOwner: 'outside client/' },
+      { kw: '内部事件管线', owner: 'scripts/check-layers.mjs', inOwner: '五类' },
+      { kw: 'AG-UI 适配端点', owner: 'packages/client-core/src/ag-ui.ts', inOwner: 'AG-UI' },
+      { kw: 'ACP 适配层后置', owner: 'scripts/check-nongoals.mjs', inOwner: 'ACP' },
+    ]
+    const bad = []
+    if (s3 === '') bad.push('正文里认不到「## 3. 协议选型定案」到那条 `---` 之间这一节')
+    if (box === '') bad.push('§3 里认不到那个围栏框图（下面三条都在读它）')
+    const lines = box.split('\n')
+    const nums = lines.map(numOf).filter((n) => n !== null)
+    const catLines = lines.map(catsOf).filter((c) => c.length > 0)
+    if (nums.length !== 1) bad.push(`那个框图里数到 ${nums.length} 行"事件层：N 种"（应为 1 行；多行或没有都说明拆面坏了）`)
+    if (catLines.length !== 1) bad.push(`那个框图里数到 ${catLines.length} 行五类枚举（应为 1 行）`)
+    const statedEvents = nums[0] ?? 0
+    const derivedCats = catLines[0] ?? []
+    if (derivedCats.length < 5) bad.push(`五类只拆到 ${derivedCats.length} 枚（少于 5 枚，这条绿不算数）`)
+    for (const c of CAT_WATCH) if (!derivedCats.includes(c)) bad.push(`框图那一行里没有「${c}」——五类少了一枚，或改名了`)
+    for (const c of derivedCats) if (!CAT_WATCH.includes(c)) bad.push(`框图多出一枚「${c}」，登记的五类名单里没有它`)
+    const bullets = s3.split('\n').filter((l) => /^- \*\*/.test(l)).map((l) => { const m = /^- \*\*(.+?)\*\*/.exec(l); return m === null ? '' : m[1] })
+    if (bullets.length < 4) bad.push(`§3 只数到 ${bullets.length} 条加粗 bullet（少于 4 条，拆面坏了）`)
+    if (bullets.length !== BULLET_WATCH.length) bad.push(`正文 ${bullets.length} 条 vs 登记表 ${BULLET_WATCH.length} 条——加一条定案要连登记表一起加`)
+    for (const w of BULLET_WATCH) {
+      if (!bullets.some((b) => b.includes(w.kw))) { bad.push(`登记表那条「${w.kw}」在 §3 的 bullet 里认不出——被改名还是被删了？`); continue }
+      const p = join(clientRoot, w.owner)
+      if (!existsSync(p)) { bad.push(`「${w.kw}」登记的归属文件不在盘上：${w.owner}`); continue }
+      if (!readFileSync(p, 'utf8').includes(w.inOwner)) bad.push(`「${w.kw}」的归属文件 ${w.owner} 里没有了「${w.inOwner}」——它还在钉这条定案吗？`)
+    }
+    for (const b of bullets) if (!BULLET_WATCH.some((w) => b.includes(w.kw))) bad.push(`§3 多出一条 bullet「${b}」——登记表没有它，也就没人钉它`)
+    report(bad.length === 0 && badBoxShape.length === 0 && s3 !== '' && box !== '',
+      `§3 那四条定案逐条对上归属文件、框图那五类逐枚对上登记（登记表 ${BULLET_WATCH.length} 条 + 五类 ${CAT_WATCH.length} 枚，双向）`,
+      badBoxShape.length > 0 ? '框图拆行的形状自证没过（上一条已点名），这一条不作数'
+        : bad.join(' ｜ ')
+          || `${bullets.length} 条 bullet 各认一次；归属依次是 ${BULLET_WATCH.map((w) => w.owner.replace(/^scripts\//, '').replace(/^packages\/client-core\/src\//, '')).join(' , ')}；五类齐`)
+
+    const catFile = join(clientRoot, 'packages/client-core/src/event-category.ts')
+    const evBad = []
+    if (!existsSync(catFile)) evBad.push('归属文件不在盘上：packages/client-core/src/event-category.ts')
+    else {
+      const body = readFileSync(catFile, 'utf8')
+      for (const c of derivedCats) if (!body.includes(`'${c}'`)) evBad.push(`适配层 ${'`event-category.ts`'} 里认不到引号形态的「${c}」——那一枚还在落五类吗？`)
+    }
+    report(evBad.length === 0 && bad.length === 0 && box !== '',
+      `框图那五类在 client-core 的适配层里各有一处分支（逐枚按引号字面量核，不认裸名字）`,
+      bad.length > 0 ? '上一格已点名（拆面或登记表没过），这一条不作数' : evBad.join(' ｜ ')
+        || `${derivedCats.length} 枚逐枚对上：${derivedCats.join(' , ')}`)
+
+    const mfPath = join(clientRoot, 'packages/client-core/src/protocol-manifest.json')
+    const mf = existsSync(mfPath) ? JSON.parse(readFileSync(mfPath, 'utf8')) : null
+    const ledgerTxt = existsSync(join(clientRoot, 'README.md')) ? readFileSync(join(clientRoot, 'README.md'), 'utf8') : ''
+    const nBad = []
+    if (mf === null) nBad.push('类型镜像清单不在盘上：packages/client-core/src/protocol-manifest.json')
+    else if (typeof mf.eventTypeCount !== 'number') nBad.push('那份清单里没有 eventTypeCount 这一枚数')
+    else if (mf.eventTypeCount !== statedEvents && !ledgerTxt.includes('计划写 44')) nBad.push(`正文写 ${statedEvents}、镜像现测 ${mf.eventTypeCount}，而台账里读不到那句纠正（「计划写 44」）——这枚旧数就成了没人管的假事实`)
+    report(nBad.length === 0 && bad.length === 0 && mf !== null && statedEvents > 0,
+      `框图里那枚事件数有下文：与镜像现测相等就作数，不等就必须能在台账读到那句纠正（改了事件契约就会在这里露出来）`,
+      bad.length > 0 ? '上面那条对账没过（已点名），这一条不作数'
+        : mf === null ? '清单不在盘上，这一条没在量任何东西'
+          : nBad.join(' ｜ ') || (mf.eventTypeCount === statedEvents
+            ? `正文 ${statedEvents} == 镜像现测 ${mf.eventTypeCount}（相等，无需纠正说法）`
+            : `正文 ${statedEvents} ≠ 镜像现测 ${mf.eventTypeCount}，台账那句「计划写 44」在`))
+  }
+}
+
+// 15. §5.2 那六个坑：#185 钉的是「计划里那张编号表 ↔ 正文逐条」，而**每个坑还有没有人守**没人钉——
+//     `check:traps` 的判定标题带 `§5.2-N`，但删掉某个坑唯一的判定不会有任何门变红（§7 那张风险表
+//     早就用"逐行对上谁在盯"钉过，#186；这条是同一把尺子量 §5.2）。
+//     判据两侧都现派生：坑数从计划正文数，守卫条数从 `check-traps.mjs` 的标签数；每条坑必须 ≥1 条判定，
+//     带 `§5.2-N` 但 N 不在坑数之内的标签也算红（那说明表与门已经各说各话）。
+{
+  const gateFile = join(clientRoot, 'scripts/check-traps.mjs')
+  const TRAP_SHAPE = [
+    { s: "check('§5.2-1 StoreLock 在启动脚本里真的被隔离', ok)", want: 1 },
+    { s: "report('§5.2-表 六条编号与正文互钉')", want: null },
+    { s: "x('§5.2-12 这不是坑号')", want: 12 },
+    { s: '没有任何标签的一行', want: null },
+  ]
+  const numIn = (s) => { const m = /§5\.2-(\d+)/.exec(s); return m === null ? null : Number(m[1]) }
+  const badTrapShape = TRAP_SHAPE.filter((c) => numIn(c.s) !== c.want)
+    .map((c) => `「${c.s.slice(0, 26)}…」→ ${JSON.stringify(numIn(c.s))}，应为 ${JSON.stringify(c.want)}`)
+  report(badTrapShape.length === 0,
+    `§5.2 坑号标签的抽取形状自证（${TRAP_SHAPE.length} 条夹具：正常标签、表标签、两位数不是坑号、没有标签的行）`,
+    badTrapShape.join(' ｜ ') || '四条夹具各抽对一次（表标签与无标签都不被误当成某个坑的守卫）')
+
+  if (!existsSync(planDoc) || !existsSync(gateFile)) {
+    report(false, '§5.2 判据的两份前提都在盘上（计划正文 + check-traps.mjs）',
+      [planDoc, gateFile].filter((p) => !existsSync(p)).map((p) => relative(clientRoot, p)).join(' ｜ ') || '未知缺失')
+  } else {
+    const plan = readFileSync(planDoc, 'utf8')
+    const a52 = plan.indexOf('### 5.2 已识别的坑')
+    const r52 = a52 === -1 ? '' : plan.slice(a52)
+    const e52 = r52.indexOf('\n## ')
+    const s52 = e52 === -1 ? '' : r52.slice(0, e52)
+    const traps = s52.split('\n').filter((l) => /^\s*\d+\.\s+\*\*/.test(l))
+      .map((l) => { const m = /^\s*(\d+)\.\s+\*\*(.+?)\*\*/.exec(l); return m === null ? null : { n: Number(m[1]), title: m[2] } })
+      .filter((t) => t !== null)
+    const body = readFileSync(gateFile, 'utf8')
+    // 只从判定调用的**第一个字符串参数**里取标签——注释里提一句"§5.2-4"不算有人守（解析器不许读注释）。
+    const labelsOf = (src) => [...src.matchAll(/(?:check|report|record)\(\s*(?:'([^']*)'|`([^`]*)`)/g)]
+      .map((m) => (m[1] ?? m[2] ?? '').replace(/\\\$/g, '$'))
+    const labels = labelsOf(body)
+    const guarded = new Map(traps.map((t) => [t.n, labels.filter((l) => numIn(l) === t.n).length]))
+    const stray = [...new Set(labels.map(numIn).filter((n) => n !== null))].filter((n) => !traps.some((t) => t.n === n))
+    const tBad = []
+    if (a52 === -1) tBad.push('计划正文里认不到「### 5.2 已识别的坑」那一节')
+    if (labels.length < 10) tBad.push(`只从 check-traps 抽出 ${labels.length} 条判定标签（少于 10 条说明取标签的形状坏了，逐条比较不作数）`)
+    if (traps.length < 6) tBad.push(`§5.2 只数到 ${traps.length} 条坑（少于 6 条说明拆面坏了，下面的比较不作数）`)
+    if (traps.map((t) => t.n).join(',') !== traps.map((_, i) => i + 1).join(',')) tBad.push(`坑号不是连续的 1..${traps.length}（实测 ${traps.map((t) => t.n).join(',')}）——#185 那张编号表与这条的口径要一起改`)
+    for (const t of traps) if ((guarded.get(t.n) ?? 0) === 0) tBad.push(`坑 ${t.n}「${t.title}」在 check-traps 里一条判定都没有——这条坑没人守了`)
+    for (const n of stray) tBad.push(`check-traps 里有 §5.2-${n} 的标签，而计划 §5.2 只有 ${traps.length} 条坑——门与计划各说各话`)
+    report(tBad.length === 0 && badTrapShape.length === 0 && a52 !== -1 && labels.length >= 10 && traps.length >= 6,
+      `§5.2 每一条坑都有 ` + '`check:traps`' + ` 的判定守着（坑数与守卫条数两侧都现派生，逐条打印）`,
+      badTrapShape.length > 0 ? '抽取的形状自证没过（上一条已点名），这一条不作数'
+        : a52 === -1 ? '认不到那一节，这一条没在量任何东西'
+          : traps.length < 6 ? `面塌了（只数到 ${traps.length} 条坑）——上面逐条比较不作数`
+            : tBad.join(' ｜ ')
+              || `${traps.length} 条坑逐条有守卫：${traps.map((t) => `${t.n}→${guarded.get(t.n)} 条`).join(' , ')}`)
+  }
+}
+
+// 16. §4.3「状态同步核心设计」那五条编号设计，此前只被**逐格**钉过（退避复位 #52、REST 兜底 #70、三档节拍 #71、
+//     块不可变 #73、五类与原子替换 #140/#141、增量 markdown #104），但**没有一张"哪条设计由谁守"的名册**——
+//     计划加第六条设计、或某条设计的守卫被删，都不会有门变红。与 §7（#186）、§5.2（#203）、§6（#195）同一族。
+{
+  const DESIGN_WATCH = [
+    { n: 1, kw: '连接世代', owner: 'packages/client-core/src/event-category.ts', inOwner: 'replay_window' },
+    { n: 2, kw: '断线重连', owner: 'packages/client-core/src/session-stream.ts', inOwner: 'jitter' },
+    { n: 3, kw: '流式渲染', owner: 'packages/client-core/src/session-model.ts', inOwner: 'PartialAccumulator' },
+    { n: 4, kw: '业务数据不进全局 store', owner: 'packages/store/test/store.test.ts', inOwner: '视图' },
+    { n: 5, kw: '事件五类化', owner: 'packages/client-core/src/event-category.ts', inOwner: 'lifecycle' },
+  ]
+  const NUM_SHAPE = [
+    { s: '1. **连接世代**：每次 SSE 建连为一个世代。', want: { n: 1, kw: '连接世代' } },
+    { s: '4. **业务数据不进全局 store**：会话消息流在 React-free 的…', want: { n: 4, kw: '业务数据不进全局 store' } },
+    { s: '普通段落，不是编号设计。', want: null },
+    { s: '10. **第十条**：假想的两位数编号。', want: { n: 10, kw: '第十条' } },
+  ]
+  const numInLine = (l) => { const m = /^(\d+)\.\s+\*\*(.+?)\*\*/.exec(l); return m === null ? null : { n: Number(m[1]), kw: m[2] } }
+  const badNumShape = NUM_SHAPE.filter((c) => JSON.stringify(numInLine(c.s)) !== JSON.stringify(c.want))
+    .map((c) => `「${c.s.slice(0, 20)}…」→ ${JSON.stringify(numInLine(c.s))}`)
+  report(badNumShape.length === 0,
+    `§4.3 编号设计的拆条形状自证（${NUM_SHAPE.length} 条夹具：一条与两条真实写法、普通段落不算、两位数算第 10 条而不是 1 条）`,
+    badNumShape.join(' ｜ ') || '四条夹具各拆对一次（普通段落没被当成设计，`10.` 没被前缀匹配成 `1`）')
+
+  if (!existsSync(planDoc)) {
+    report(false, '计划正文在盘上（§4.3 判据的前提）', `找不到 ${relative(clientRoot, planDoc)}——这一条没在量任何东西`)
+  } else {
+    const plan = readFileSync(planDoc, 'utf8')
+    const a43 = plan.indexOf('### 4.3 状态同步核心设计')
+    const r43 = a43 === -1 ? '' : plan.slice(a43)
+    const e43 = r43.indexOf('\n### 4.4')
+    const s43 = e43 === -1 ? '' : r43.slice(0, e43)
+    const derived = s43.split('\n').map(numInLine).filter((d) => d !== null)
+    const dBad = []
+    if (s43 === '') dBad.push('正文里认不到「### 4.3 状态同步核心设计」到「### 4.4」之间这一节')
+    if (derived.length < 5) dBad.push(`只数到 ${derived.length} 条编号设计（少于 5 条说明拆面坏了，这条绿不算数）`)
+    if (derived.map((d) => d.n).join(',') !== derived.map((_, i) => i + 1).join(',')) dBad.push(`编号不是连续的 1..${derived.length}（实测 ${derived.map((d) => d.n).join(',')}）`)
+    if (derived.length !== DESIGN_WATCH.length) dBad.push(`正文 ${derived.length} 条 vs 名册 ${DESIGN_WATCH.length} 条——加一条设计要连名册一起加`)
+    for (const w of DESIGN_WATCH) {
+      const hit = derived.filter((d) => d.n === w.n && d.kw.includes(w.kw))
+      if (hit.length !== 1) { dBad.push(`名册第 ${w.n} 条「${w.kw}」在正文里命中 ${hit.length} 条（要恰好一条）`); continue }
+      const p = join(clientRoot, w.owner)
+      if (!existsSync(p)) { dBad.push(`第 ${w.n} 条的归属文件不在盘上：${w.owner}`); continue }
+      if (!readFileSync(p, 'utf8').includes(w.inOwner)) dBad.push(`第 ${w.n} 条「${w.kw}」的归属文件 ${w.owner} 里没有了「${w.inOwner}」——它还在守这条设计吗？`)
+    }
+    for (const d of derived) if (!DESIGN_WATCH.some((w) => w.n === d.n && d.kw.includes(w.kw))) dBad.push(`正文第 ${d.n} 条「${d.kw}」名册里没有——这条设计没人认领`)
+    report(dBad.length === 0 && badNumShape.length === 0 && s43 !== '',
+      `§4.3 五条编号设计逐条对上归属文件（名册双向，编号连续；归属里真的有那句证据）`,
+      badNumShape.length > 0 ? '拆条的形状自证没过（上一条已点名），这一条不作数'
+        : s43 === '' ? '认不到 §4.3 那一节，这一条没在量任何东西'
+          : dBad.join(' ｜ ')
+            || `${derived.length} 条逐条对上；归属依次是 ${DESIGN_WATCH.map((w) => w.owner.replace(/^packages\//, '')).join(' , ')}`)
+
+    // §4.3 第 5 条正文里写的也是那枚旧事件数：与 §3 的框图同一把尺子——相等就作数，不等就要求台账读得到那句纠正。
+    const evNum = /(\d+) 种 sidecar 事件/.exec(s43)
+    const mfPath = join(clientRoot, 'packages/client-core/src/protocol-manifest.json')
+    const mf = existsSync(mfPath) ? JSON.parse(readFileSync(mfPath, 'utf8')) : null
+    const lTxt = existsSync(join(clientRoot, 'README.md')) ? readFileSync(join(clientRoot, 'README.md'), 'utf8') : ''
+    const dnBad = []
+    if (evNum === null) dnBad.push('§4.3 里没有「N 种 sidecar 事件」那句（要么被改写，要么这条在量的东西没了）')
+    else if (mf === null || typeof mf.eventTypeCount !== 'number') dnBad.push('读不到类型镜像的 eventTypeCount')
+    else if (Number(evNum[1]) !== mf.eventTypeCount && !lTxt.includes('计划写 44')) dnBad.push(`§4.3 写 ${evNum[1]}、镜像现测 ${mf.eventTypeCount}，而台账读不到那句纠正`)
+    report(dnBad.length === 0 && dBad.length === 0 && evNum !== null && mf !== null,
+      `§4.3 那枚事件数与 §3 框图同一把尺子：等于镜像现测就作数，不等于就必须有台账那句纠正`,
+      dBad.length > 0 ? '上一条名册没过（已点名），这一条不作数'
+        : dnBad.join(' ｜ ')
+          || (Number(evNum[1]) === mf.eventTypeCount
+            ? `§4.3 ${evNum[1]} == 镜像现测 ${mf.eventTypeCount}（相等，无需纠正说法）`
+            : `§4.3 ${evNum[1]} ≠ 镜像现测 ${mf.eventTypeCount}，台账那句「计划写 44」在`))
+  }
+}
+
+// 17. §4.2 那张分包表（计划写「约 10 包」）与实际工作区此前只被一次性核回过（#72 那次改掉四条 package.json
+//     的过期自述），**没有常驻对照**：新加一个包（M2 就加了三个：`ui-files` / `ui-git` / `ui-schedule`）
+//     或把某个包改名，计划那张表与真实目录会各说各话而没人报警。这条把两侧双向钉住：
+//     表里点名的包必须真在盘上；盘上每个 `packages/*` 与 `apps/*` 要么在表里，要么登记在"后加包"名册里
+//     并写明它服务哪个里程碑（理由必须带 `M` + 数字，否则等于没写）。
+{
+  const LATER = [
+    { dir: 'packages/ui-files', because: 'M2 文件预览与 @file 候选' },
+    { dir: 'packages/ui-git', because: 'M2 影子检查点面板与 Git 工作台' },
+    { dir: 'packages/ui-schedule', because: 'M2 定时任务看板' },
+    // 首跑就抓到它：`apps/spike` 不在 §4.2 那张表里，也不是三个 M2 面板包之一。
+    // 它是 §6 M0 第 3 条那台一次性 spike（不是产品面），所以按名册的规矩带上它服务的里程碑号。
+    { dir: 'apps/spike', because: 'M0 单页直连 SSE 的 spike 台（一次性验收，不是产品包）' },
+  ]
+  const NAME_SHAPE = [
+    { s: '`client-core`', want: 'client-core' },
+    { s: '`ui-primitives`', want: 'ui-primitives' },
+    { s: '`apps/web` + `apps/desktop`', want: 'apps/web + apps/desktop' },
+    { s: '没有反引号的一格', want: null },
+  ]
+  const nameOf = (cell) => { const m = /^`([\w./-]+)`(?:\s*\+\s*`([\w./-]+)`)?$/.exec(cell.trim()); return m === null ? null : m[2] === undefined ? m[1] : `${m[1]} + ${m[2]}` }
+  const badNameShape = NAME_SHAPE.filter((c) => nameOf(c.s) !== c.want)
+    .map((c) => `「${c.s}」→ ${JSON.stringify(nameOf(c.s))}`)
+  report(badNameShape.length === 0,
+    `§4.2 包名单元格的拆法形状自证（${NAME_SHAPE.length} 条夹具：单个反引号名、带连字符名、两个 app 合写的一格、没有反引号的一格不算）`,
+    badNameShape.join(' ｜ ') || '四条夹具各拆对一次（合写那格保持成一枚，不被拆成两个包名）')
+
+  if (!existsSync(planDoc)) {
+    report(false, '计划正文在盘上（§4.2 判据的前提）', `找不到 ${relative(clientRoot, planDoc)}——这一条没在量任何东西`)
+  } else {
+    const plan = readFileSync(planDoc, 'utf8')
+    const a42 = plan.indexOf('### 4.2 分包方案')
+    const r42 = a42 === -1 ? '' : plan.slice(a42)
+    const e42 = r42.indexOf('\n### 4.3')
+    const s42 = e42 === -1 ? '' : r42.slice(0, e42)
+    const cells = s42.split('\n')
+      .filter((l) => l.trim().startsWith('|') && !/^\s*\|[\s:-]+\|/.test(l))
+      .map((l) => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim()))
+      .filter((c) => c.length === 3 && c[0] !== '包')
+    const listed = new Set()
+    for (const c of cells) for (const one of nameOf(c[0]) === null ? [] : nameOf(c[0]).split(' + ')) listed.add(one)
+    const onDisk = new Set([
+      ...readdirSync(join(clientRoot, 'packages'), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => `packages/${d.name}`),
+      ...readdirSync(join(clientRoot, 'apps'), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => `apps/${d.name}`),
+    ])
+    const laterDirs = new Set(LATER.map((l) => l.dir))
+    const pBad = []
+    if (s42 === '') pBad.push('正文里认不到「### 4.2 分包方案」到「### 4.3」之间这一节')
+    if (cells.length < 9) pBad.push(`那张表只数到 ${cells.length} 行（少于 9 行说明拆表坏了，比较不作数）`)
+    if (onDisk.size < 12) pBad.push(`盘上只数到 ${onDisk.size} 个包/app 目录（少于 12 个说明扫描面塌了）`)
+    for (const one of listed) {
+      const rel = one.startsWith('packages/') || one.startsWith('apps/') ? one : join('packages', one)
+      if (!existsSync(join(clientRoot, ...rel.split('/'))) && !existsSync(join(clientRoot, one))) pBad.push(`表里点名「${one}」，盘上却没有这个目录——被改名还是被删了？`)
+    }
+    for (const d of onDisk) {
+      const bare = d.replace(/^packages\//, '')
+      if (listed.has(d) || listed.has(bare) || laterDirs.has(d)) continue
+      pBad.push(`盘上有 ${d}，既不在 §4.2 那张表里，也不在"后加包"名册里——新包要么进表，要么带里程碑理由登记`)
+    }
+    for (const l of LATER) {
+      if (!onDisk.has(l.dir)) pBad.push(`"后加包"名册里那条 ${l.dir} 已经不在盘上了——名册过期`)
+      if (!/\bM\d/.test(l.because)) pBad.push(`${l.dir} 的理由没带里程碑号（` + '`M` + 数字）——等于没写')
+    }
+    report(pBad.length === 0 && badNameShape.length === 0 && s42 !== '',
+      `§4.2 那张分包表与真实工作区双向相等（表 ${cells.length} 行 / 盘上 ${onDisk.size} 个目录 / 名册外后加包 ${LATER.length} 个各带里程碑理由）`,
+      badNameShape.length > 0 ? '拆法的形状自证没过（上一条已点名），这一条不作数'
+        : s42 === '' ? '认不到 §4.2 那一节，这一条没在量任何东西'
+          : cells.length < 9 || onDisk.size < 12 ? `面塌了（表 ${cells.length} 行 / 盘上 ${onDisk.size} 个）——上面的比较不作数`
+            : pBad.join(' ｜ ')
+              || `表点名 ${listed.size} 个包全部在盘上；盘上 ${onDisk.size} 个目录全部有归属（名册外 ${LATER.length} 个：${LATER.map((l) => `${l.dir.replace(/^(packages|apps)\//, '')}←${l.because}`).join(' , ')}`)
+  }
+}
+
+// 18. §9 那三条验收标准（DoD）的"签 / 不签"此前只是我写的一句话，而且**台账里只有 v1.0 有一行判定**——
+//     MVP 与 v2.0 的证据散在别的行里，读的人无法判断这两条到底签没签。本轮补上那两行，并把规则派生化：
+//     一条 DoD **可签** ⟺ 它涵盖的里程碑成员全是 `done`/`once`（复用 block 12 那份名册，不留第二份），
+//     且登记的未闭 blocker 在台账里读不到。所以这条**两面都挡**：成员没齐就写 ✅ ⇒ 红（挡过早签）；
+//     成员齐了、blocker 也消了却还挂着 ⚠ ⇒ 也红（挡"永远不签"）——#27 一闭，本条就会要求 MVP 那行改成 ✅。
+{
+  const DOD_WATCH = [
+    { line: 'MVP', alias: '§9 MVP DoD', milestones: ['M0', 'M1'], blockers: ['仍未活过（#27）'] },
+    { line: 'v1.0', alias: '§9 v1.0', milestones: ['M2'], blockers: ['没活过（#27）', '整体不签'] },
+    { line: 'v2.0', alias: '§9 v2.0 DoD', milestones: ['M3'], blockers: ['两项搁置', '是搁置不是完成'] },
+  ]
+  const DOD_SHAPE = [
+    { s: '- **MVP**：无官方桌面端参与，浏览器完成一次完整编码任务；', want: 'MVP' },
+    { s: '- **v1.0**：日常开发可完全替代官方桌面端核心流程；', want: 'v1.0' },
+    { s: '- **v2.0**：Windows 安装包双击即用。', want: 'v2.0' },
+    { s: '- 没有粗体名前的一条。', want: null },
+  ]
+  const dodName = (l) => { const m = /^- \*\*(.+?)\*\*：/.exec(l); return m === null ? null : m[1] }
+  const badDodShape = DOD_SHAPE.filter((c) => dodName(c.s) !== c.want).map((c) => `「${c.s.slice(0, 18)}…」→ ${JSON.stringify(dodName(c.s))}`)
+  report(badDodShape.length === 0,
+    `§9 DoD 行的拆名形状自证（${DOD_SHAPE.length} 条夹具：三条真实写法与一条没有粗体名前）`,
+    badDodShape.join(' ｜ ') || '四条夹具各认对一次（没有「- **名**：」形状的不被当成一条 DoD）')
+
+  const ledgerFile = join(clientRoot, 'README.md')
+  const gTxt = existsSync(ledgerFile) ? readFileSync(ledgerFile, 'utf8') : ''
+  const gAt = gTxt.indexOf('## 里程碑状态')
+  const gRest = gAt === -1 ? '' : gTxt.slice(gAt)
+  const gEnd = gRest.indexOf('\n## ', 4)
+  const gSec = gEnd === -1 ? '' : gRest.slice(0, gEnd)
+  const gRows = gSec.split('\n')
+    .filter((l) => l.trim().startsWith('|') && !/^\s*\|[\s:-]+\|/.test(l))
+    .map(splitCells).filter((c) => c.length === 3 && c[0] !== '计划项')
+  const planTxt = existsSync(planDoc) ? readFileSync(planDoc, 'utf8') : ''
+  const p9 = planTxt.indexOf('## 9. 验收标准')
+  const p9rest = p9 === -1 ? '' : planTxt.slice(p9)
+  const p9end = p9rest.indexOf('\n## ')
+  const s9 = p9end === -1 ? p9rest : p9rest.slice(0, p9end)
+  const dodLines = s9.split('\n').map(dodName).filter((n) => n !== null)
+  const gBad = []
+  if (BOX.length === 0) gBad.push('§6 那份名册是空的（block 12 没跑到或被改坏）——这条的可签规则没有输入')
+  if (p9 === -1) gBad.push('计划正文里认不到「## 9. 验收标准」那一节')
+  if (dodLines.length < 3) gBad.push(`§9 只数到 ${dodLines.length} 条 DoD（少于 3 条说明拆面坏了，比较不作数）`)
+  if (gAt === -1 || gRows.length < 30) gBad.push(`台账那张状态表认不到或只数到 ${gRows.length} 行——本条没有可比的判定行`)
+  for (const n of dodLines) if (!DOD_WATCH.some((d) => d.line === n)) gBad.push(`§9 新增了一条 DoD「${n}」，名册里没有它`)
+  for (const d of DOD_WATCH) {
+    if (!dodLines.includes(d.line)) { gBad.push(`名册那条「${d.line}」在 §9 里认不到了——DoD 改了名要连名册一起改`); continue }
+    const hits = gRows.filter((c) => c[0].startsWith(d.alias))
+    if (hits.length !== 1) { gBad.push(`DoD「${d.line}」在状态表里有 ${hits.length} 行判定（要恰好一行，别名「${d.alias}」）`); continue }
+    const members = BOX.filter((w) => d.milestones.includes(w.m))
+    if (members.length === 0) { gBad.push(`DoD「${d.line}」的里程碑 ${d.milestones.join('/')} 在 §6 名册里一个成员都没有`); continue }
+    const unfinished = members.filter((w) => w.st !== 'done' && w.st !== 'once')
+    const liveBlockers = d.blockers.filter((p) => gTxt.includes(p))
+    const signable = unfinished.length === 0 && liveBlockers.length === 0
+    const signed = /^✅/.test(hits[0][1])
+    if (signed && !signable) gBad.push(`DoD「${d.line}」在表里写 ✅，但成员里还有 ${unfinished.length} 条非 done/once、台账里还读得到 ${liveBlockers.length} 句未闭说法——不许过早签`)
+    if (!signed && signable) gBad.push(`DoD「${d.line}」的成员全已落地且台账读不到任何未闭说法，表里却仍写「${hits[0][1].slice(0, 22)}」——挂着不签也是错`)
+  }
+  report(gBad.length === 0 && badDodShape.length === 0 && BOX.length > 0 && dodLines.length >= 3 && gRows.length >= 30,
+    `§9 三条 DoD 各有一行判定，且签不签由 §6 名册 + 台账未闭说法派生（两面都挡：过早签 / 挂着不签）`,
+    badDodShape.length > 0 ? '拆名的形状自证没过（上一条已点名），这一条不作数'
+      : BOX.length === 0 || p9 === -1 || dodLines.length < 3 || gAt === -1 || gRows.length < 30
+        ? `面塌了（名册 ${BOX.length} 条 / §9 ${dodLines.length} 条 / 表 ${gRows.length} 行）——上面那条逐条比较不作数`
+          : gBad.join(' ｜ ')
+            || `三条 DoD 各一行判定；现测：${DOD_WATCH.map((d) => { const m = BOX.filter((w) => d.milestones.includes(w.m)); const u = m.filter((w) => w.st !== 'done' && w.st !== 'once').length; const b = d.blockers.filter((p) => gTxt.includes(p)).length; return `${d.line}：成员 ${m.length} 条里 ${u} 条未闭 / 台账 blocker ${b} 句` }).join(' ｜ ')}`)
+}
+
+
+
+// --- 块 19：审批验收脚本"自述覆盖几态"必须等于内核真契约下的三态往返 ---
+{
+  const apPath = join(clientRoot, 'scripts/accept-approval.ts')
+  const apSrc = existsSync(apPath) ? readFileSync(apPath, 'utf8') : ''
+  // 内核契约（src/server/approval-routes.ts 读 body 的 decision / remember，session-manager 把非 approve 一律当 reject，
+  // event-tap 发的 approval_resolved 只有 approve / reject 两种）。所以三态各自的形状是：
+  //   允许一次 = decision 'approve' 且不带 remember；始终允许 = 'approve' + remember:true；拒绝 = 非 approve 的 decision。
+  const callsOf = (s) => {
+    const out = []
+    for (const m of s.matchAll(/\b(?:answerApproval|drive)\(/g)) {
+      const seg = s.slice(m.index, m.index + 260)
+      const d = /decision:\s*'([^']+)'/.exec(seg)
+      if (!d) continue
+      out.push({ decision: d[1], remember: /remember:\s*true/.test(seg) })
+    }
+    return out
+  }
+  const Q = "'"
+  const CALL_SHAPE = [
+    { s: `api.answerApproval(id, r, { decision: ${Q}approve${Q} })`, want: [{ decision: 'approve', remember: false }] },
+    { s: `api.answerApproval(id, r, { decision: ${Q}approve${Q}, remember: true })`, want: [{ decision: 'approve', remember: true }] },
+    { s: `api.answerApproval(id, r, { decision: ${Q}reject${Q} })`, want: [{ decision: 'reject', remember: false }] },
+    { s: `api.answerApproval(id, r)`, want: [] },
+    { s: `const drive = async (answer: { decision: 'approve' | 'reject' }) => {}`, want: [] },
+  ]
+  const badShape = CALL_SHAPE.filter((c) => JSON.stringify(callsOf(c.s)) !== JSON.stringify(c.want))
+    .map((c) => `「${c.s}」→ ${JSON.stringify(callsOf(c.s))}（应 ${JSON.stringify(c.want)}）`)
+  const calls = callsOf(apSrc)
+  const once = calls.some((c) => c.decision === 'approve' && !c.remember)
+  const always = calls.some((c) => c.decision === 'approve' && c.remember === true)
+  const deny = calls.some((c) => c.decision !== 'approve')
+  const covered3 = once && always && deny
+  const claimLines = apSrc.split(/\r?\n/).filter((l) => /✓|实测通过|openInstance\(/.test(l)).join('\n')
+  const claims3 = /三态/.test(claimLines)
+  const gapLine = /未覆盖[^\n]*始终允许[^\n]*拒绝/.test(apSrc)
+  const ledgerTxt = (existsSync(join(clientRoot, 'README.md')) ? readFileSync(join(clientRoot, 'README.md'), 'utf8') : '')
+    + (existsSync(join(clientRoot, 'EVIDENCE.md')) ? readFileSync(join(clientRoot, 'EVIDENCE.md'), 'utf8') : '')
+  const ledgerHasGap = ledgerTxt.includes('仍未活过')
+  report(apSrc !== '' && badShape.length === 0 && claims3 === covered3 && (covered3 ? !gapLine : gapLine && ledgerHasGap),
+    '审批验收脚本自述覆盖了哪几态，必须等于内核真契约下的三态往返（允许一次 / 始终允许 = `approve`+`remember:true` / 拒绝 = 非 `approve`；从 `answerApproval` 调用点派生 + 四条形状自证 + 补上了就自动改口的正控）',
+    apSrc === '' ? '读不到 scripts/accept-approval.ts——这一条没在量任何东西'
+      : badShape.length > 0 ? '调用点抽取的形状自证没过，这一条不作数：' + badShape.join(' ｜ ')
+        : covered3
+          ? `三态齐（一次/始终/拒绝）：自述必须提三态且"未覆盖"那行要撤（现测 claims3=${claims3} gapLine=${gapLine}）`
+          : `现测 ${calls.length} 个 answerApproval 调用点 ⇒ 允许一次=${once} 始终允许=${always} 拒绝=${deny}；自述提三态=${claims3}、"未覆盖"那行=${gapLine}、台账 blocker 那句=${ledgerHasGap}`)
+}
 if (failures.length > 0) {
   console.error(`\nFAILED: ${failures.join(' | ')}`)
   process.exit(1)

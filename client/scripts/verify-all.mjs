@@ -13,6 +13,7 @@
  * 它跑绿并接进了 ci-smoke——"决定做完了"就要从 parked 名单里走出去，留在这里会变成永久豁免。）
  */
 import { spawnSync } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { listProjectRuntimes } from './lib-instance.mjs'
@@ -60,7 +61,29 @@ if (chosen.length === 0) {
 {
   const k = kernelSidecarFreshness(resolve(clientRoot, '..'))
   console.log(`${k.status === 'ok' ? '✓' : '✗'} sidecar 产物不早于内核源码（整条线的每一步都起这一份） — ${k.message}`)
-  if (k.status !== 'ok') process.exit(1)
+  if (k.status !== 'ok') {
+    // 这道预飞是不是"顺手挡一下"，还是要命的承重墙？拿现测回答，不靠记忆：按步骤表里每条命令指向的那份
+    // 脚本**自身文本**（一层，不追传递导入）分两类——会起 sidecar 的、以及其中自带新鲜度自查的。
+    // 未被自带自查盖住的那些台，就是这道全局预飞去不得的理由；这个数会随实现变，所以每次失败都现算现打。
+    // 面为空时**不许给结论**（0 份脚本推不出"每台都自保"），扫描面按平台分隔符都认（Windows 的反斜杠是关键）。
+    const pointed = chosen.flatMap((s) => (s.args ?? []).map((a) => String(a))).filter((a) => /[\\/]scripts[\\/][\w.-]+\.(mjs|ts)$/.test(a))
+    const scripts = [...new Set(pointed.map((p) => p.split(/[\\/]/).pop()))]
+    const bodies = new Map(scripts.map((n) => {
+      const p = join(clientRoot, 'scripts', n)
+      return [n, existsSync(p) ? readFileSync(p, 'utf8') : '']
+    }))
+    const booters = scripts.filter((n) => /launch-sidecar|openInstance|kernelSidecarFreshness|serve-client/.test(bodies.get(n) ?? ''))
+    const selfGuarded = booters.filter((n) => /lib-freshness/.test(bodies.get(n) ?? ''))
+    const uncovered = booters.filter((n) => !selfGuarded.includes(n))
+    const absent = scripts.filter((n) => bodies.get(n) === '')
+    const face = scripts.length === 0 ? '（本趟挑的步骤里没有一条命令指向 `scripts/` 下的脚本——扫描面为空，这句不作数）'
+      : booters.length === 0 ? `本趟挑到的 ${scripts.length} 份脚本都不起 sidecar，这道预飞对本趟那几步没有影响（要跑会起进程的步，这里就会逐台点名）`
+        : `本趟挑到的步指向 ${scripts.length} 份脚本${absent.length ? `，其中 ${absent.length} 份不在盘上（${absent.join(' , ')}）` : ''}，`
+          + `判定会起 sidecar 的 ${booters.length} 台（${booters.join(' , ')}），其中自带新鲜度自查的 ${selfGuarded.length} 台（${selfGuarded.join(' , ') || '无'}），`
+          + `只靠这道全局预飞兜住的 ${uncovered.length} 台${uncovered.length > 0 ? `（${uncovered.join(' , ')}）⇒ 这道去不得` : '⇒ 本趟这些台各自已自保'}`
+    console.log(`   预飞是不是承重的：${face}。分类按脚本自身文本判（一层，不追传递导入）。`)
+    process.exit(1)
+  }
 }
 
 const out = []

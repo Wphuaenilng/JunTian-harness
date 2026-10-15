@@ -21,14 +21,15 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 
-/** 本包名——用于确认找到的声明属于本包，而非祖先链上无关项目的。 */
+/** 版本行的显示名（`--version` 输出 `tianshu-harness v…`）；产品改名是独立一轮，这里不动。 */
 const PACKAGE_NAME = 'tianshu-harness'
 
 /**
- * 改名前的旧包名（3.22.x 及更早以 tianshu-tui 发布）。过渡期身份校验双认：
- * 旧全局安装的 package.json 仍是旧名，不兼容则版本探测/更新检查对存量用户失效。
+ * 认作本包的 package.json `name`。本仓迁到 JunTian-harness 后包名是 juntian-harness；
+ * 3.22.x 及更早发布为 tianshu-tui、3.23–3.28 发布为 tianshu-harness，存量安装的
+ * package.json 仍是旧名，不一起认则版本探测与更新检查对它们失效。
  */
-const LEGACY_PACKAGE_NAME = 'tianshu-tui'
+const KNOWN_PACKAGE_NAMES = new Set(['juntian-harness', 'tianshu-harness', 'tianshu-tui'])
 
 /** 从脚本路径（默认 argv[1]）向上找最近的、**属于本包**的 package.json 目录。 */
 export function findInstallRoot(scriptPath: string | undefined = process.argv[1]): string | null {
@@ -44,9 +45,9 @@ export function findInstallRoot(scriptPath: string | undefined = process.argv[1]
     if (existsSync(pkgPath)) {
       try {
         const parsed = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { name?: unknown; version?: unknown }
-        // name 必须匹配：只认本包的声明（含改名前的旧包名）。只看 version 会命中
+        // name 必须匹配：只认本包的声明（含历史包名）。只看 version 会命中
         // 外层无关项目（runtime bundle 解压进别人的项目目录时），把他人版本当成本包版本。
-        if ((parsed.name === PACKAGE_NAME || parsed.name === LEGACY_PACKAGE_NAME) && typeof parsed.version === 'string' && parsed.version.length > 0) {
+        if (typeof parsed.name === 'string' && KNOWN_PACKAGE_NAMES.has(parsed.name) && typeof parsed.version === 'string' && parsed.version.length > 0) {
           // Staged dist carries product metadata too; a source/npm installation
           // still owns its parent package root (including updater install type).
           if (basename(dir) === 'dist') {

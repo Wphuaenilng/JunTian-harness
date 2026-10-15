@@ -11,6 +11,7 @@
  *   node scripts/check-layers.mjs --quiet    # 只报失败（CI）
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { cssFilesUnder, rulesOf, stripComments } from './lib-css-rules.mjs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -1195,6 +1196,47 @@ const codeHomes = (needle) => scriptFiles
       : dangling.length > 0
         ? dangling.map(([tok, where]) => `.${tok}（${where} 找它，产品源码里已没有这个名字）`).join(' ｜ ')
         : `${seen.size} 个类名锚点全部在场（门与验法共 ${gateFiles.length} 份文件，产品源码 ${productFiles.length} 份）`)
+}
+
+// 分层纪律的 CSS 那一半：包里的类归包自己上色。宿主 `apps/web` 的样式表**不许给某个包自己定义的类名写规则**。
+// 反方向早就有人管（上面那条：门与验法引用的类名锚点必须在产品源码里存在），这个方向此前靠人眼——#170 那处
+// 「✕ 按钮的样式住在宿主、类名归包」就是看见才知道的。**这条只管选择器层面**：宿主在 tsx 里使用包导出的类名
+// 是 §4.2 的组合方式，不是越界上色，不在这条射程里（label 不许比判据能）。
+{
+  const clsOf = (sel) => [...new Set([...sel.matchAll(/\.([a-zA-Z][\w-]*)/g)].map((m) => m[1]))]
+  const classesIn = (text) => { const out = new Set(); for (const r of rulesOf(stripComments(text), '')) for (const c of clsOf(r.selector)) out.add(c); return out }
+  const defsOf = (files) => {
+    const m = new Map()
+    for (const f of files) for (const r of rulesOf(stripComments(readFileSync(f, 'utf8')), f)) for (const c of clsOf(r.selector)) if (!m.has(c)) m.set(c, String(r.file).replace(/\\/g, '/').replace(clientRoot.replace(/\\/g, '/') + '/', ''))
+    return m
+  }
+  // 形状自证。第一条夹具就是这次实测撞出来的反例：**未剥注释时这里会数出 7 处"越界"，全是注释里的举例**
+  // （`.rail-btn`、`.mini`、`.set__close`、`.app__secs`、`.sc`、`.sc__new`、`.sc__trigger`），
+  // 共用件剥掉注释之后交集是 0。第二条钉逗号选择器组的其余各段也要认（#176 那轮的教训）。
+  const CSS_SHAPE = [
+    { s: '.a { color: red } /* 注释里的 .b 不算一处越界 */', want: ['a'] },
+    { s: '.c, .d { top: 0 }', want: ['c', 'd'] },
+    { s: '/* .e 整条规则都写在注释里 */', want: [] },
+  ]
+  const shapeBad = CSS_SHAPE.filter((c) => {
+    const got = [...classesIn(c.s)].sort()
+    return JSON.stringify(got) !== JSON.stringify([...c.want].sort())
+  }).map((c) => `「${c.s.slice(0, 20)}…」→ ${JSON.stringify([...classesIn(c.s)])}`)
+  record('宿主不越界上色', '类名拆解的形状自证（注释里的举例不算、逗号选择器组的每一段都算、整条在注释里的不算）',
+    shapeBad.length === 0, shapeBad.join(' ｜ ') || `${CSS_SHAPE.length} 组夹具各拆对一次`)
+
+  const pkg = defsOf(cssFilesUnder(clientRoot, 'packages'))
+  const host = defsOf(cssFilesUnder(clientRoot, 'apps/web/src'))
+  const bad = [...host.keys()].filter((c) => pkg.has(c))
+  // 面下界从当轮现测派生（包内类名 233 枚 / 宿主类名 37 枚），取现测的八成：面塌了"交集 0"就不作数。
+  const FLOOR_PKG = 180
+  const FLOOR_HOST = 30
+  record('宿主不越界上色', '宿主样式表的选择器里不出现任何包定义的类名（只看选择器层面；tsx 里使用包导出的类不在这条射程）',
+    shapeBad.length === 0 && pkg.size >= FLOOR_PKG && host.size >= FLOOR_HOST && bad.length === 0,
+    shapeBad.length > 0 ? '上面那条形状自证没过，这条绿不作数'
+      : pkg.size < FLOOR_PKG || host.size < FLOOR_HOST ? `扫描面塌了（包内类名 ${pkg.size} 枚 < ${FLOOR_PKG}，或宿主 ${host.size} 枚 < ${FLOOR_HOST}）——"零越界"这句没有意义`
+        : bad.length > 0 ? bad.map((c) => `.${c}：宿主 ${host.get(c)} 给它写了规则，而它由 ${pkg.get(c)} 定义`).join(' ｜ ')
+          : `包内类名 ${pkg.size} 枚 ／ 宿主类名 ${host.size} 枚 ／ 交集 0 处`)
 }
 
 // ---------------------------------------------------------------- report
