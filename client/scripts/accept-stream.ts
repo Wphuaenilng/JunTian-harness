@@ -8,14 +8,16 @@
  *   node scripts/launch-sidecar.mjs && node scripts/accept-stream.ts
  */
 import { readFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { SidecarClient, SessionModel, openSessionStream } from '../packages/client-core/src/index.ts'
-import { openInstance } from './lib-instance.ts'
+import { openInstance, probeWorkspace } from './lib-instance.ts'
 import { spendOf } from './lib-spend.ts'
 
-const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const repoRoot = resolve(clientRoot, '..')
+// 会话 cwd 用临时探针工作区，不用操作者仓根（#174 家族最后一条漏网）：内核往**任何会话 cwd** 种
+// `.rivet/`，而 `src/agent/memory-epoch.ts` 的 LEGACY_FILES 又按 `<cwd>` 删其中已有的文件。这台以前
+// 只有它把仓根当会话 cwd，而它声明 `{ spends: true }`——零花费的 `verify-accept-zero`（仓根 `.rivet/`
+// 前后计数）永远跑不到它，所以这件事此前只活在注释里。
+const ws = probeWorkspace('stream')
+console.log(`probe root  ${ws.cwd}${ws.note === '' ? '' : ` ｜ ${ws.note}`}`)
 const { api, info } = openInstance('M0/M1 端到端流式（发消息 → 看 text_delta → turn_complete）', { spends: true })
 const health = await api.health()
 if (!health.configured) {
@@ -31,7 +33,7 @@ const modelFlag = process.argv.indexOf('--model')
 const modelArg = (modelFlag >= 0 ? process.argv[modelFlag + 1] : 'deepseek-flash') ?? 'deepseek-flash'
 
 const session = await api.createSession({
-  cwd: repoRoot,
+  cwd: ws.cwd,
   title: 'M0 acceptance',
   approvalMode: 'manual',
   model: modelArg,

@@ -2276,6 +2276,173 @@ report(brokenTables.length === 0, 'every README table renders (row widths match 
             : bad.length > 0 ? bad.join(' ｜ ')
               : `扫 ${String(files.length)} 份、${String(windowsTotal)} 台会话〔${Object.entries(bucketTotal).map(([k, n]) => `${k}×${String(n)}`).join('，')}〕；pw 函数体=${pwBody.replace(/\s+/g, ' ').slice(0, 52)}…，gitignore 第 ${String(giLine.n)} 行="${giLine.l}"；逐档 ${perFile.filter((p) => !/0 处/.test(p)).join(' ｜ ')}`)
 }
+/**
+ * 12. ADR-0001 落地判定（`docs/decisions/0001-单仓与全栈自主可控.md`，status: accepted）。
+ *
+ * 门先立在文档改动之前：首跑应有四条红，红了才证明判据真的在打那九份仓根文件，而不是
+ * 写完之后倒推着补的绿灯。唯一一条今天就该绿的是 ⑤——它是正控，防的是"顺手把 pro 分层
+ * 机制当闭源残留拆掉"，它红了才是事故。
+ *
+ * 五条可观察量：① 双仓/闭源/死链安装包这几类禁句在口径文档面里归零（份数取自
+ * `ADR_ALL_DOCS`、枚数取自 `ADR_BANS`，都现算并打印，不写死在文案里）；② 外部 PR 处置政策的
+ * 锚点句必须**还在**（正控，防"取消双仓"被做成"取消政策"）；③ 桌面端事实源转到 `client/`，
+ * `docs/desktop-guide.md` 标 deprecated 且不删档；④ 四份语言 README 不许承诺发不出的安装包，
+ * 且必须留诚实替代句（防"删掉就算改完"）；⑤ pro 机制三件制品在位。
+ */
+const ADR_ROOT_DOCS = ['AGENTS.md', 'CLAUDE.md', '.rivet.md', 'EXTERNAL-PRS.md', 'CONTRIBUTING.md', 'README.md', 'README.en.md', 'README.ja.md', 'README.ko.md']
+// 2026-10-16 扩面：同族残留还在三份**现行手册**里（installation.md 教人下载不存在的安装包、
+// architecture-overview.md 仍把 `desktop/` 当桌面端落点、user-guide.md 有安装承诺）。
+// 只数仓根九份 = 首屏改干净、手册里继续发死链。
+// 为什么 `analysis-reports/项目文档与对比报告.md` 那两处不扩进来：它抬头写着「生成日期：2026-10-08 /
+// 只读静态分析」，里面「闭源边界：`desktop/`…」「`desktop/` 不在公开仓」记的是**当时看到的现状**，
+// 改它等于篡改调研——按 ADR-0001 的历史不动原则，既不写，也不进门的面。
+const ADR_DOCS_EXT = ['docs/guides/installation.md', 'docs/user-guide.md', 'docs/architecture-overview.md']
+const ADR_ALL_DOCS = [...ADR_ROOT_DOCS, ...ADR_DOCS_EXT]
+const adrText = (rel) => { const p = join(repoRoot, rel); return existsSync(p) ? readFileSync(p, 'utf8') : null }
+const adrDocs = ADR_ALL_DOCS.map((rel) => ({ rel, text: adrText(rel) }))
+const adrMissing = adrDocs.filter((d) => d.text === null).map((d) => d.rel)
+
+const ADR_BANS = [
+  { tag: '双仓·开发主仓', re: /开发主仓|dev 主仓/ },
+  { tag: '双仓·同步投影', re: /同步投影|投影而来/ },
+  { tag: '双仓·英文措辞', re: /projection of the dev repo|the public repo is synchronized from it/i },
+  { tag: '闭源叙事', re: /闭源/ },
+  { tag: 'Tauri 桌面端', re: /Tauri \+ React/ },
+  // 桌面端的**产品落点**不许再写根级 `desktop/`（那目录不在本仓）；但 `src/diagnostics/log-locations.ts`
+  // 把 `'desktop'` 定成日志组 id、`<数据根>/desktop` 是运行时目录，所以 sidecar-exit / sessions 那两类
+  // 真路径必须放过——把它们一起判红，下次就有人整条宽松化掉。
+  { tag: '根级 desktop/ 落点', re: /`desktop\/(?!sidecar-exit|sessions)/ },
+  { tag: '安装包死链', re: /releases\/latest/ },
+  // 2026-10-16 补的两枚：单仓化第一轮把「开发主仓/同步投影」这类正面措辞清掉了，但同一套
+  // 前提还有别的写法——「随 sync 进公开仓」「dev 仓这份」都不在前七枚的射程里，实测漏过
+  // CLAUDE.md 的一句插件说明（那文件在面里，形状在面外）。`dev 仓(?!库)` 是防误伤：
+  // 「在 dev 仓库里跑」这种正常中文不能算双仓叙事。
+  { tag: '双仓·sync 交付链', re: /随 sync|进公开仓|覆盖公开仓/ },
+  { tag: '双仓·dev 仓措辞', re: /dev 仓(?!库)|dev仓(?!库)/ },
+]
+const adrBanHits = []
+for (const d of adrDocs) {
+  if (d.text === null) continue
+  d.text.split('\n').forEach((line, i) => {
+    for (const b of ADR_BANS) if (b.re.test(line)) adrBanHits.push(`${d.rel}:${i + 1}〔${b.tag}〕`)
+  })
+}
+// 匹配器自证：既要咬得住真禁句，也不能把合法的新文案（`client/apps/desktop/`、诚实替代句、
+// 政策句）误判成红——误伤一次，下次就有人来把这条例宽松化掉。
+const ADR_BAN_FIXTURES = [
+  { want: true, s: '> 本仓是开发主仓的同步投影。' },
+  { want: true, s: '桌面端（`desktop/`）与部分高级实现不在本仓（闭源边界见 EXTERNAL-PRS.md）。' },
+  { want: true, s: 'Desktop app: download from [GitHub Releases](https://github.com/a/b/releases/latest)' },
+  { want: true, s: 'The public repo is a projection of the dev repo.' },
+  { want: true, s: '| `desktop/src` | 约 450 文件 / 9.6 万行（React） |' },
+  { want: false, s: '桌面端壳在 `client/apps/desktop/`，Web 端在 `client/apps/web/`。' },
+  { want: false, s: '安装包尚未发布：本仓当前 0 个 Release，桌面端从源码运行。' },
+  { want: false, s: '外部 PR 先评审、按当前代码重写后落地，以 sync-merged 关闭。' },
+  { want: false, s: '| `desktop/sidecar-exit.json` | sidecar 終了理由のパンくず | 終了時 |' },
+  { want: false, s: '| `desktop/sessions/<id>/events.jsonl` | デスクトップ UI イベントストリーム |' },
+  // 新两枚的形状自证：既要咬住双仓叙事的另外两种写法，又不能把「sync-merged」「dev 仓库」
+  // 这类正常中文误判成红——误伤一次，下次就有人来把它宽松化掉。
+  { want: true, s: '桌面端与 VS Code 插件随 sync 进公开仓。' },
+  { want: true, s: 'dev 仓这份不再覆盖公开仓，台账以公开仓那份为准。' },
+  { want: false, s: '外部 PR 以 sync-merged 关闭；本仓就是那份公开仓。' },
+  { want: false, s: '在 dev 仓库里跑一次 `npm run dev` 就够了。' },
+]
+const adrBanFixBad = ADR_BAN_FIXTURES
+  .filter((f) => ADR_BANS.some((b) => b.re.test(f.s)) !== f.want)
+  .map((f) => `${f.want ? '该认没认' : '误伤'}：${f.s.slice(0, 26)}`)
+
+report(adrBanFixBad.length === 0 && adrMissing.length === 0 && adrBanHits.length === 0,
+  `ADR-0001 ① ${ADR_ALL_DOCS.length} 份口径文档里没有这几类字样：${ADR_BANS.map((b) => b.tag).join(' / ')}（${ADR_BANS.length} 枚禁句、${ADR_BAN_FIXTURES.length} 条夹具自证；实扫 ${adrDocs.length - adrMissing.length} 份，命中 ${adrBanHits.length} 处）`,
+  adrBanFixBad.length > 0 ? `禁句匹配器的夹具自证没过（${adrBanFixBad.join(' ｜ ')}），这一条不作数`
+    : adrMissing.length > 0 ? `文件不在盘上：${adrMissing.join(' , ')}`
+      : adrBanHits.length > 0 ? `${adrBanHits.slice(0, 8).join(' ｜ ')}${adrBanHits.length > 8 ? ` ｜ 另有 ${adrBanHits.length - 8} 处` : ''}` : '')
+
+// ② 政策锚点正控：取消双仓叙事不等于取消 PR 处置流程。这些串在政策文件里少一处就是红，
+// 所以"把整段政策顺手删了"和"把双仓前提改写掉了"分得开。
+const ADR_POLICY = [
+  { rel: 'EXTERNAL-PRS.md', needles: [['sync-merged', 2], ['never merged directly', 1], ['CREDITS.md', 1], ['CONTRIBUTORS.md', 1]] },
+  { rel: 'CONTRIBUTING.md', needles: [['sync-merged', 1], ['merged directly', 1]] },
+]
+const adrPolicyBad = []
+for (const p of ADR_POLICY) {
+  const t = adrText(p.rel)
+  if (t === null) { adrPolicyBad.push(`${p.rel} 不在盘上（政策文件被删了？）`); continue }
+  for (const [needle, min] of p.needles) {
+    const n = t.split(needle).length - 1
+    if (n < min) adrPolicyBad.push(`${p.rel} 里「${needle}」只剩 ${n} 处（政策要求 >=${min}）`)
+  }
+}
+report(adrBanFixBad.length === 0 && adrPolicyBad.length === 0,
+  `ADR-0001 ② 外部 PR 处置政策的锚点句仍在两份文件里（${ADR_POLICY.reduce((a, p) => a + p.needles.length, 0)} 枚锚点，逐枚数出现次数）`,
+  adrBanFixBad.length > 0 ? '上面那条夹具自证没过，这一条不作数'
+    : adrPolicyBad.length > 0 ? adrPolicyBad.join(' ｜ ') : '')
+
+// ③ 桌面端事实源：`docs/desktop-guide.md` 讲的是一个发不出的 Tauri 产物——标 deprecated 但
+// 不删档；四份 README 凡仍列它作入口的行必须带上 deprecated 注记，且要把桌面端指向 client/。
+const dgPath = join(repoRoot, 'docs', 'desktop-guide.md')
+const dgText = existsSync(dgPath) ? readFileSync(dgPath, 'utf8') : null
+const dgFront = dgText === null ? '' : dgText.split('\n').slice(0, 12).join('\n')
+// `docs/` 在 client/ 之外，检出带 CRLF（本机 core.autocrlf=true）：`$` 前不写 `\r?` 的话，
+// 这条行级锚点会**永远不匹配**——判据红了却是门瞎，不是文档没改。
+const dgDeprecated = /^status:[ ]*deprecated[ ]*\r?$/m.test(dgFront)
+const adrDgBad = []
+if (dgText === null) adrDgBad.push('docs/desktop-guide.md 被删了（决策要求不删档）')
+else if (!dgDeprecated) adrDgBad.push('docs/desktop-guide.md 的 frontmatter 没有 status: deprecated')
+for (const d of adrDocs) {
+  if (d.text === null || !d.rel.startsWith('README')) continue
+  d.text.split('\n').forEach((line, i) => {
+    if (line.includes('docs/desktop-guide.md') && !/deprecated/i.test(line)) adrDgBad.push(`${d.rel}:${i + 1} 仍把 desktop-guide 当现行入口（那行没有 deprecated 注记）`)
+  })
+  if (!d.text.includes('client/')) adrDgBad.push(`${d.rel} 全文没有 client/，桌面端事实源没落到本仓`)
+}
+report(adrBanFixBad.length === 0 && adrDgBad.length === 0,
+  'ADR-0001 ③ 桌面端事实源是本仓 `client/`，desktop-guide 标 deprecated 且不删档（四份 README 的入口行同批核）',
+  adrBanFixBad.length > 0 ? '上面那条夹具自证没过，这一条不作数'
+    : adrDgBad.length > 0 ? `${adrDgBad.slice(0, 6).join(' ｜ ')}${adrDgBad.length > 6 ? ` ｜ 另有 ${adrDgBad.length - 6} 处` : ''}` : '')
+
+// ④ 发不出的承诺：新仓 Release 实测 0 个，四份语言 README 各留一句诚实替代说法。
+// 只查"死链消失"会放过"整段删掉"，所以替代句与死链两条并查。
+const ADR_HONEST = {
+  'README.md': '安装包尚未发布',
+  'README.en.md': 'installers are not published yet',
+  'README.ja.md': 'インストーラーは未公開',
+  'README.ko.md': '설치 파일은 아직 공개되지 않음',
+  // 2026-10-16 扩面：手册里那条死链同样要换成诚实说法，只删链不留说法 = 读者不知道桌面端去哪了。
+  'docs/guides/installation.md': '安装包尚未发布',
+  'docs/user-guide.md': '安装包尚未发布',
+}
+const adrHonestBad = Object.entries(ADR_HONEST)
+  .filter(([rel, phrase]) => { const t = adrText(rel); return t === null || !t.includes(phrase) })
+  .map(([rel]) => `${rel} 缺诚实替代句`)
+// 死链要**重新扫四份 README**，不能拿 ① 的命中清单来推——那份清单里只有
+// `README.ko.md:NNN〔安装包死链〕` 这种标签，字面量并不含 `releases/latest`，
+// 用它当判据等于这条永远不会红（2026-10-16 变异一实测抓出的假绿）。
+const adrDeadLinks = Object.keys(ADR_HONEST).flatMap((rel) => {
+  const t = adrText(rel)
+  if (t === null) return []
+  return t.split("\n").map((l, i) => (/releases\/latest/.test(l) ? `${rel}:${i + 1}` : null)).filter(Boolean)
+})
+report(adrBanFixBad.length === 0 && adrHonestBad.length === 0 && adrDeadLinks.length === 0,
+  `ADR-0001 ④ ${Object.keys(ADR_HONEST).length} 份口径文档既不承诺 releases/latest 安装包，也各自留了"尚未发布"的替代说法（缺句 ${adrHonestBad.length} 份、残留死链 ${adrDeadLinks.length} 处）`,
+  adrBanFixBad.length > 0 ? '上面那条夹具自证没过，这一条不作数'
+    : [adrHonestBad.join(' ｜ '), adrDeadLinks.length ? `仍有死链：${adrDeadLinks.join(' , ')}` : ''].filter(Boolean).join(' ｜ ') || '')
+
+// ⑤ 正控：pro 分层是"对端不在本仓的扩展缝"，不是可以顺手拆掉的闭源残留。三件制品少一件就红，
+// 而它今天就应该绿——它绿着才说明这一条打的是"将来的误拆"，不是这次的文案改动。
+const ADR_PRO = [
+  { rel: 'src/__tests__/npm-pack-boundary.test.ts', needle: null },
+  { rel: 'tsup.config.ts', needle: 'src/pro/index.ts' },
+  { rel: 'src/api/pro-registry.ts', needle: 'pro/index.js' },
+]
+const adrProBad = ADR_PRO.filter((a) => {
+  const p = join(repoRoot, a.rel)
+  if (!existsSync(p)) return true
+  return a.needle !== null && !readFileSync(p, 'utf8').includes(a.needle)
+}).map((a) => a.rel)
+report(adrProBad.length === 0,
+  'ADR-0001 ⑤（正控）pro 扩展缝的三件制品仍在位：包边界测试 × tsup 独立 entry × 注册表动态 import',
+  adrProBad.length > 0 ? `不在了：${adrProBad.join(' , ')}` : '机制未动，这条防的是将来把它当闭源残留拆掉')
+
 if (failures.length > 0) {
   console.error(`\nFAILED: ${failures.join(' | ')}`)
   process.exit(1)

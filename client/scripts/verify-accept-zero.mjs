@@ -19,7 +19,7 @@
  *   node scripts/verify-accept-zero.mjs
  */
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -64,26 +64,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
  * The other half of isolation: the store is not the only thing a session touches — the runtime seeds
  * `<session cwd>/.rivet/` (skills + its own db), which `accept-panel.ts` asserts as its judgement ⑥.
  * Several probes used the **repo root** as their session cwd, so an acceptance run wrote runtime files
- * into the operator's working tree no matter how well the store was isolated. Count that tree before
- * and after; growth is this suite dirtying the operator's checkout, and it must name the mechanism.
+ * into the operator's working tree no matter how well the store was isolated. Compare that tree's
+ * *file-name set* before and after — one ruler for both the count printed and the verdict made
+ * (an entry-count helper here once disagreed with the name list by 10 directories while claiming
+ * "N 个文件", which is exactly the two-homes failure this repo keeps hunting).
  */
-const countTree = (root) => {
-  let n = 0
-  const stack = [root]
-  while (stack.length > 0) {
-    const d = stack.pop()
-    let names
-    try { names = readdirSync(d) } catch { continue }
-    for (const name of names) {
-      const p = join(d, name)
-      n += 1
-      try { if (statSync(p).isDirectory()) stack.push(p) } catch { /* 别人正开着或刚被收走 */ }
-    }
-  }
-  return n
-}
 const seedWatch = join(resolve(clientRoot, '..'), '.rivet')
-const seedBefore = countTree(seedWatch)
 /** 不只数个数：记下每一次比对时的**文件名集合**，这样才能答"是哪一台动的、动了哪一个文件"。 */
 const listTree = (root) => {
   const out = []
@@ -102,8 +88,40 @@ const listTree = (root) => {
   }
   return out.sort()
 }
-let seedNames = listTree(seedWatch)
+// 这把集合比对刀自己要有反例：旧版判据比的是**条目计数**，"删一枚又种一枚"在那里两个数相等就放行。
+// 现在只比 sorted 名字集合；上面那句宣称靠这 4 条夹具自证，不靠读代码的人信我。
+const sameTree = (a, b) => a.length === b.length && a.every((x, i) => x === b[i])
+const TREE_FIX = [
+  { n: '两棵相等', a: ['x.md', 'y.md'], b: ['x.md', 'y.md'], want: true },
+  { n: '多一枚', a: ['x.md', 'y.md'], b: ['x.md', 'y.md', 'z.md'], want: false },
+  { n: '等长但换名（计数版会在这里放行）', a: ['playbook.jsonl', 'y.md'], b: ['knowledge/memory.jsonl', 'y.md'], want: false },
+  { n: '少一枚', a: ['a', 'b'], b: ['a'], want: false },
+]
+for (const f of TREE_FIX) {
+  if (sameTree(f.a, f.b) !== f.want) {
+    console.error(`✗ containment 判据自己的集合比对没过夹具「${f.n}」（期望 ${String(f.want)}，实读 ${String(sameTree(f.a, f.b))}）——这一条不作数`)
+    process.exit(1)
+  }
+}
+const seedNames0 = listTree(seedWatch)
+let seedNames = seedNames0
 const seedDrift = []
+const goneNames = []
+// 内核那把"按会话 cwd 删存量"的刀，清单从它自己的源码现读，不手抄：`src/agent/memory-epoch.ts`
+// 的 LEGACY_FILES 是相对 `<cwd>` 的一组名字，逐个 `rmSync(join(cwd, rel))`。它的 epoch 标记写在
+// stateDir()（= RIVET_HOME），而这一趟带 `--isolate-home` ⇒ 每一跑都是一次全新尝试，不是"上一次
+// 已经清过了所以这次安全"。仓根的 `.rivet/` 少了东西时，先看少的那枚在不在这份清单里。
+const legacyNames = (() => {
+  try {
+    const src = readFileSync(join(clientRoot, '..', 'src', 'agent', 'memory-epoch.ts'), 'utf8')
+    const block = (/const LEGACY_FILES = \[([\s\S]*?)\]/.exec(src) ?? [])[1] ?? ''
+    return [...block.matchAll(/'([^']+)'/g)].map((m) => m[1].replace(/^\.rivet\//, ''))
+  } catch {
+    return []
+  }
+})()
+// 打出来：这份清单要是解析空了，"认出靶子"那一支就永远不会触发，而读者看不出少了这一档。
+console.log(`  i 内核存量刀清单（现读 src/agent/memory-epoch.ts）：${legacyNames.length > 0 ? legacyNames.join('、') : `没读到——若这轮有缺席，归属只能列名不能认`}；仓根 .rivet/ 开跑前 ${String(seedNames.length)} 枚`)
 
 const run = (args, timeout = 180_000) =>
   spawnSync(node, args, { cwd: clientRoot, encoding: 'utf8', timeout, env: process.env })
@@ -136,22 +154,33 @@ try {
     const gone = seedNames.filter((x) => !nowNames.includes(x))
     const fresh = nowNames.filter((x) => !seedNames.includes(x))
     if (gone.length + fresh.length > 0) {
+      for (const g of gone) if (!goneNames.includes(g)) goneNames.push(g)
       seedDrift.push(`${file} 这台上：${gone.length > 0 ? `删了 ${gone.join(', ')}` : ''}${gone.length > 0 && fresh.length > 0 ? '；' : ''}${fresh.length > 0 ? `多了 ${fresh.join(', ')}` : ''}`)
     }
     seedNames = nowNames
   }
-  const seedAfter = countTree(seedWatch)
-  check('验证跑不往操作者的工作树里写（仓根 .rivet/ 的文件集合前后完全相等；不等就点名是哪一台动的、动了哪个文件）',
-    seedAfter === seedBefore && seedDrift.length === 0,
-    `开跑前 ${seedBefore} 个文件，跑完 ${seedAfter} 个`
+  const seedEnd = listTree(seedWatch)
+  const sameSet = sameTree(seedNames0, seedEnd)
+  const lateDrift = !sameTree(seedNames, seedEnd)
+  check('验证跑不往操作者的工作树里写（仓根 .rivet/ 的文件名字集合前后完全相等；不等就点名是哪一台动的、动了哪个文件）',
+    sameSet && seedDrift.length === 0,
+    `开跑前 ${String(seedNames0.length)} 个文件，跑完 ${String(seedEnd.length)} 个`
+    + (lateDrift ? '；且这份收尾读数与"最后一台跑完那一刻"的集合又不一样——变化落在最后一台之后、收尾之前，归不到任何一台脚本名下' : '')
     + (seedDrift.length === 0 ? '' : `；逐台比对的漂移：${seedDrift.join(' ｜ ')}`)
-    + (seedAfter > seedBefore
+    + (seedEnd.length === seedNames0.length && !sameSet
+      ? '——两个数相等而集合不等：这一跑删了一枚又种了一枚。旧版这里比的是**条目计数**（还把目录也算进去，于是它打印的"文件数"和逐名比对的并不是同一棵树），那种写法会在这里放行，所以现在只比名字集合。'
+      : seedEnd.length > seedNames0.length
       ? '——多出来说明有探针把会话 cwd 设在仓根，而内核会往任何会话 cwd 里种 .rivet/（skills + 它自己的库，accept-panel 判据⑥量的正是这件事）。存储层隔离得再好，工作树照样被写脏。'
-      : seedAfter < seedBefore
+      : seedEnd.length < seedNames0.length
         ? `——少了说明这一跑删掉了仓根 .rivet/ 里**已有**的东西，比写脏更糟。`
         + (/\/vsw\/|^vsw\//.test(seedDrift.join(' '))
           ? '（点名的路径落在 .rivet/vsw/ 下：与内核的死会话 worktree 清扫一致——它的根是 `join(baseCwd, \'.rivet\', \'vsw\')`，而隔离 sidecar 不搬会话库，于是会在操作者的仓根里收别人的 worktree。假设，未用重跑验证。）'
           : '')
+        + (goneNames.length > 0 && legacyNames.some((n) => goneNames.includes(n))
+          ? `（少的这些里认出了内核那把存量刀的靶子：清单从 \`src/agent/memory-epoch.ts\` 现读 = ${legacyNames.join('、')}，删法是逐个 \`rmSync(join(<会话 cwd>, rel))\`，而它的 epoch 标记在 RIVET_HOME 里、这一跑带 \`--isolate-home\` ⇒ 每跑都是全新一次，不是"上次清过这次就安全"。这不是"存储层没隔离"，是**还有一台的会话 cwd 落在仓根**；落点这件事由 check:docs 里那条按 \`createSession\` 的 \`cwd:\` 做传递闭包的判定守着，它不需要有人真跑这一趟。）`
+          : goneNames.length > 0 && legacyNames.length === 0
+            ? `（内核那份 LEGACY_FILES 没读到（源码路径或形状变了），所以这轮缺席的 ${goneNames.length} 枚我只列出来、认不出归属——归属认不出不改变结论：集合不等本身就是红。）`
+            : '')
         : ''))
 } finally {
   if (launched) {
