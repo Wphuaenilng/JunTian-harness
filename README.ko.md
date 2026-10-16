@@ -137,7 +137,7 @@ Layer 4: RuntimeHookPipeline（75 hooks） → trap-and-emulate 拦截退化行�
 |------|------|
 | `src/` 소스（TypeScript, 테스트 제외） | 약 1,256 파일 / 30만 줄（가장 큰 `agent/`는 483 파일） |
 | `src/` 테스트 | 약 1,592 파일 / 31만 줄（node:test, 소스와 약 1:1） |
-| `desktop/src` | 약 450 파일 / 9.6만 줄（React）, 별도로 Rust 약 1.1만 줄 |
+| `client/` 데스크톱（本仓自研） | 규모는 `git ls-files client`로 직접 세기 — 이 표에 두 번째 사본을 두지 않음 |
 | `vscode-extension/src` | 17 파일 / 약 2,700 줄 |
 | 누적 커밋 | **8,008**（2026-05-15 생성, 약 4.5개월; 최근 30일 1,769） |
 | 타입 체크 | `tsc` strict + `noUncheckedIndexedAccess` |
@@ -154,11 +154,8 @@ Layer 4: RuntimeHookPipeline（75 hooks） → trap-and-emulate 拦截退化行�
 
 ### 2. 설치（택一）
 
-**방식 A: 데스크톱 앱（설치하면 바로 사용）** —— [GitHub Releases](https://github.com/Wphuaenilng/JunTian-harness/releases/latest)에서 다운로드: macOS `.dmg`（Apple Silicon / Intel 이중 아키텍처）· Windows `.exe` 설치 마법사 · Linux `.AppImage`.
-> **Linux 지원 범위（3.11.2 최초 제공）**: x64 AppImage 무설치——`chmod +x Tianshu_*.AppImage` 후 바로 실행. glibc ≥ 2.35（Ubuntu 22.04+ / Debian 12+ 등 주요 배포판） 필요, X11 세션 권장（Wayland는 미검증）. 알려진 제한: 음성 입력은 아직 불가（whisper 커뮤니티 빌드 부재로 브라우저 음성에 자동 폴백）; 데스크톱 자동 업데이트는 Linux에서도 동작합니다.
-
-> **Windows 지원 범위**: Windows 10（1809+, 22H2 권장）/ Windows 11. 화면 렌더링은 **WebView2 Runtime（≥ 120 권장）**에 의존합니다——v3.5부터의 스크롤·렌더링 최적화는 최신 런타임이 필요하며, 구버전은 세션 영역 스크롤이 끊깁니다. 3.5.3부터 설치 프로그램에 완전한 오프라인 설치 패키지가 내장됩니다（네트워크 불필요, 시스템 레벨 등록）. 기존 사용자가 자동 업데이트 후 "너무 오래됨" 안내를 받으면: 안내 바 또는 「설정 → 런타임 및 정보」에서 「복구 도구 실행」. **창이 아예 열리지 않을 때**는 시작 메뉴의 「WebView2 복구」를 사용하거나, [Releases](https://github.com/Wphuaenilng/JunTian-harness/releases/latest)에서 `windows-repair` 디렉터리의 `repair-webview2.cmd`를 더블클릭하세요. 또는 [WebView2 오프라인 설치 패키지](https://go.microsoft.com/fwlink/p/?LinkId=2124703)를 수동 설치 후 재시작하세요.
-> **Win10 태블릿 모드 알려진 동작**: 태블릿 모드에서 앱 전환 시 이전 앱이 화면 밖으로 밀려납니다——computer_use 스냅샷이 가림/백그라운드 자가복구를 수행하므로（PrintWindow 렌더링）태블릿 모드를 끌 필요가 없습니다.
+**방식 A: 데스크톱 앱 — 설치 파일은 아직 공개되지 않음** —— 데스크톱 클라이언트는 이 저장소의 `client/`（`apps/web` + `apps/desktop` + `packages/ui-*`）에서 개발 중이며, `src/server/`의 sidecar를 HTTP/SSE로 사용해 CLI와 같은 agent 커널을 구동합니다. 따라서 지금은 소스로만 실행할 수 있습니다. 빌드 절차·게이트·알려진 경계는 [client/README.md](client/README.md)에 두고 여기에 중복하지 않습니다. 「지금 Release가 몇 개냐」 같은 수는 낡기 쉬우니 적지 않습니다.
+> 옛 안내서 [`docs/desktop-guide.md`](docs/desktop-guide.md)（deprecated）는 기록으로만 남기고 현재 진입점은 아닙니다.
 
 **방식 B: 원클릭 설치 스크립트（권장）** —— Node ≥ 24 확인 → `tianshu-harness` 전역 설치（기본 npmmirror 미러 가속, `NPM_CONFIG_REGISTRY`로 덮어쓰기 가능）→ `tianshu` 실행. 멱등하게 반복 실행 가능:
 
@@ -609,7 +606,7 @@ TUI는 CLI의 기본 표면입니다. 데스크톱 앱（Tauri）과 VS Code/Cur
 - **sidecar 메모리 적응**: 힙 상한을 머신 메모리별로 자동 분급（8G→2G / 16G→4G / 32G→6G / 64G+→8G, `RIVET_SIDECAR_HEAP_MB`로 덮어쓰기 가능）, ≤8GB 머신은 자동으로 lean 리소스 단계
 - **watchdog 자동 복구**: 경계 정체 시 자동으로 이어 실행, 데스크톱 타임라인에서 복구 이벤트를 볼 수 있습니다（⟳ 자동 복구 / ⏹ 할당량 소진）
 - **다중 세션 동시**: 탭 바에서 여러 세션 관리, 각각 독립 cwd + 모델 + 승인 모드
-- **WSL 연결 런타임** (Windows): 원클릭으로 WSL 내부에서 실행되는 런타임에 연결합니다. 세션, 파일 읽기/쓰기, 명령 실행이 모두 Linux 측에서 이루어집니다. 연결을 끊으면 WSL 측 프로세스가 자동으로 정리됩니다. 양측은 독립적으로 업그레이드할 수 있습니다 — 자세한 내용은 [데스크톱 사용자 가이드](docs/desktop-guide.md)를 참조하세요.
+- **WSL 연결 런타임** (Windows): 원클릭으로 WSL 내부에서 실행되는 런타임에 연결합니다. 세션, 파일 읽기/쓰기, 명령 실행이 모두 Linux 측에서 이루어집니다. 연결을 끊으면 WSL 측 프로세스가 자동으로 정리됩니다. 양측은 독립적으로 업그레이드할 수 있습니다 — 자세한 내용은 [데스크톱 사용자 가이드](docs/desktop-guide.md)（deprecated, 옛 데스크톱 버전의 서술）를 참조하세요. 현재 빌드의 구현 현황은 [client/README.md](client/README.md)에.
 - **기능 패널**（왼쪽 바 `⌘1…9` 전환）: Mission Control（다중 세션 콘솔）, Inbox（받은 편지함）, Automations（정기 작업）, Skills / Hooks 관리, Git / GitHub, Changes（변경 검토）, Delegation（파견 함대와 팀 wave DAG）, Cockpit 운전석
 - **Popout 독립 창**: 단일 세션 스레드를 독립 창으로 팝아웃, 멀티 스크린 병행
 - **JobsDock / TodoDock 상주 서랍**: 백그라운드 작업 도킹 바（로그 펼치기 / Kill / 터미널에서 열기）, 탭 간 상주 todo
@@ -635,7 +632,7 @@ TUI는 CLI의 기본 표면입니다. 데스크톱 앱（Tauri）과 VS Code/Cur
 | `Shift+Tab` | Plan / Agent 모드 전환 |
 | `Esc Esc` | 되감기（데스크톱 Rewind） |
 
-> 데스크톱 앱에는 Cockpit 운전석, SideChat 우회 질문（⌘;）, Rewind 타임 트래블, 테마/Glass/배경화면, Mirror 미러 가속 등 고유 기능이 더 있습니다——자세한 내용은 [데스크톱 사용자 가이드](docs/desktop-guide.md)를 참조하세요.
+> 데스크톱 앱에는 Cockpit 운전석, SideChat 우회 질문（⌘;）, Rewind 타임 트래블, 테마/Glass/배경화면, Mirror 미러 가속 등 기능이 더 있습니다——자세한 내용은 [데스크톱 사용자 가이드](docs/desktop-guide.md)（deprecated）를 참조하세요. 현재 빌드가 실제로 다루는 범위는 [client/README.md](client/README.md)에.
 
 ### 📱 모바일 리모트（Mobile Remote）
 
@@ -662,7 +659,7 @@ TUI는 CLI의 기본 표면입니다. 데스크톱 앱（Tauri）과 VS Code/Cur
 - 인식은 전 과정이 로컬에서 일어나며, 녹음은 기기를 떠나지 않습니다.
 - 한 번 클릭하면 녹음이 시작되고, 다시 클릭하면 종료 후 인식합니다.
 - 로컬 엔진을 쓸 수 없을 때（모델 미다운로드 등）macOS는 시스템 음성 인식으로 자동 폴백하고, Windows는 모델이 준비되지 않았다고 안내합니다.
-- 더 높은 정확도를 원한다면 base 모델（약 244MB）로 교체하세요: `desktop/scripts/fetch-whisper-runtime.js --with-base`로 미리 다운로드.
+- 더 높은 정확도를 원한다면 base 모델（약 244MB）로 교체 가능: 다만 미리 다운로드 스크립트는 옛 데스크톱 빌드 쪽에 있고 **이 저장소에 없다** — 여기서 실행할 수 없다.
 - 네트워크 제한 환경에서는 `RIVET_WHISPER_PROXY=http://代理:端口`로 모델 다운로드를 가속할 수 있습니다.
 
 ### ⚡ Lean 리소스 단계（저메모리 / 저디스크）
@@ -1153,7 +1150,7 @@ tianshu logs open desktop            # 打开 sidecar 日志目录（GUI 起不�
 | 문서 | 설명 |
 |------|------|
 | [`docs/user-guide.md`](docs/user-guide.md) | 설치, 설정과 사용 가이드 |
-| [`docs/desktop-guide.md`](docs/desktop-guide.md) | 데스크톱 사용자 가이드（Cockpit/SideChat/Rewind/테마/Mirror 등 고유 기능） |
+| [`docs/desktop-guide.md`](docs/desktop-guide.md) | 옛 데스크톱 사용자 가이드（deprecated — 현재 클라이언트는 `client/`, 안내는 [client/README.md](client/README.md)） |
 | [`docs/user-guide-provider-config.md`](docs/user-guide-provider-config.md) | 모델 제공자 설정 가이드 |
 | [`docs/user-guide-vision.md`](docs/user-guide-vision.md) | 이미지 인식（비전 채널）설정과 문제 해결 |
 | [`docs/user-guide-sandbox-permissions.md`](docs/user-guide-sandbox-permissions.md) | 샌드박스와 권한 모델 전체 가이드 |

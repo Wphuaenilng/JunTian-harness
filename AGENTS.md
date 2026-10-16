@@ -1,6 +1,6 @@
 # 天枢 (Tiānshū) — AGENTS.md
 
-> 本仓是开发主仓的同步投影（外部 PR 处置与双仓模型见 [EXTERNAL-PRS.md](EXTERNAL-PRS.md)）。
+> 本仓是唯一事实源，不存在另一层不公开的"主仓"（外部 PR 的处置流程见 [EXTERNAL-PRS.md](EXTERNAL-PRS.md)）。
 > 本文件是给在本仓工作的 agent / 贡献者的最小上手说明。
 
 ## 项目
@@ -23,14 +23,14 @@ node dist/cli/entry.js  # 启动
 | `src/` | 内核：agent 循环（`src/agent/`）、工具（`src/tools/`）、API 客户端（`src/api/`）、提示词与缓存（`src/prompt/`、`src/cache/`） |
 | `vscode-extension/` | VS Code / Cursor 插件（开源，sidecar 客户端） |
 | `docs/` | 用户手册（`user-guide.md`）、架构、changelog、发布记录（`releases/`） |
-| `scripts/` | 构建、测试 runner、门禁、公开仓同步 |
+| `scripts/` | 构建、测试 runner、门禁 |
 | `plugins/` | 示例插件（office 系列等） |
 
-桌面端（`desktop/`）与部分高级实现不在本仓（闭源边界见 [EXTERNAL-PRS.md](EXTERNAL-PRS.md)）。
+桌面端在本仓 `client/`（`apps/web` + `apps/desktop` + `packages/ui-*`），作为 `src/server/` sidecar 的客户端驱动同一内核；`client/` 之外不再有第二份桌面端实现。
 
 ## 贡献
 
-- PR 不会被直接 merge——内容经评审后移植进开发主仓、验证、再同步回本仓（关闭 ≠ 拒绝）：[EXTERNAL-PRS.md](EXTERNAL-PRS.md)
+- PR 不会被直接 merge——内容经评审后按本仓当前代码重写、验证通过后落地本仓（关闭 ≠ 拒绝）：[EXTERNAL-PRS.md](EXTERNAL-PRS.md)
 - 贡献者指南：[CONTRIBUTING.md](CONTRIBUTING.md)；安全披露：[SECURITY.md](SECURITY.md)
 - 贡献者名单：[CONTRIBUTORS.md](CONTRIBUTORS.md)（全体 PR 作者，与 merge 状态无关）
 

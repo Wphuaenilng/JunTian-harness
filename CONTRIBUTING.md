@@ -8,15 +8,15 @@ Thank you for your interest in contributing! This document explains what you can
 2. Run `npx tsc --noEmit` and `npm test` before pushing
 3. One logical change per PR — keep it reviewable
 
-## How PRs Get Merged (Dual-Repo sync-merge Flow)
+## How PRs Get Landed (rewrite-then-land flow)
 
-This repo does **not** merge PRs with the merge button. The dev repo is the single
-source of truth; the public repo is synchronized from it. Every community PR goes
+This repo does **not** merge PRs with the merge button. This repo is itself the single
+source of truth — there is no private upstream to sync down from. Every community PR goes
 through the same four-step disposal:
 
-1. **Review & land in dev** — approved changes enter the dev main first.
-2. **Sync to public** — the next sync run carries them here
-   (`sync: from dev repo` commits).
+1. **Review & rework** — approved content is rewritten by the maintainer against the
+   current code in this repo.
+2. **Land as our own commit** — a `feat:` / `fix:` commit here that references the PR number.
 3. **`sync-merged` label + close** — a maintainer marks the PR `sync-merged` and
    closes it with a note. **A closed PR with `sync-merged` is merged, not rejected.**
 4. **Credit commit** — your name and email land as a `Co-authored-by:` trailer,

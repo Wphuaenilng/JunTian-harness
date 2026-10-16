@@ -134,7 +134,7 @@ Once the degradations are intercepted layer by layer, models begin to express th
 |--------|-------|
 | `src/` source (TypeScript, excl. tests) | ~1,256 files / ~300k lines (`agent/` alone is 483 files) |
 | `src/` tests | ~1,592 files / ~310k lines (node:test, ~1:1 with source) |
-| `desktop/src` | ~450 files / ~96k lines (React), plus ~11k lines of Rust |
+| `client/` desktop (built in this repo) | size: count it with `git ls-files client` — deliberately not duplicated here |
 | `vscode-extension/src` | 17 files / ~2,700 lines |
 | Commits | **8,008** total (created 2026-05-15, ~4.5 months; 1,769 in the last 30 days) |
 | Type checking | `tsc` strict + `noUncheckedIndexedAccess` |
@@ -168,8 +168,8 @@ Agent core logic (multi-turn loops, tool pipelines, context compaction) is notor
 
 ### 2. Install (pick one)
 
-**A. Desktop app (ready to use)** — download from [GitHub Releases](https://github.com/Wphuaenilng/JunTian-harness/releases/latest): macOS `.dmg` (Apple Silicon / Intel) · Windows `.exe` setup wizard · Linux `.AppImage`.
-> **Linux support scope (new in 3.11.2)**: x64 AppImage, no install needed — `chmod +x Tianshu_*.AppImage` and run; requires glibc ≥ 2.35 (Ubuntu 22.04+ / Debian 12+ and other mainstream distros); X11 recommended (Wayland untested). Known limitation: voice input is unavailable on Linux for now (no community whisper build — falls back to browser speech); desktop auto-update works on Linux too.
+**A. Desktop app — installers are not published yet.** The desktop client is developed in this repo under `client/` (`apps/web` + `apps/desktop` + `packages/ui-*`) and drives the same agent kernel through the `src/server/` sidecar (HTTP/SSE), so for now it can only be run from source; build steps, gates and known limits are written in [client/README.md](client/README.md) rather than duplicated here — and no "how many releases exist today" count is quoted, since that goes stale.
+> The legacy guide [`docs/desktop-guide.md`](docs/desktop-guide.md) (deprecated) is kept as history, not as the current entry point.
 
 **B. One-line installer (recommended)** — checks Node ≥ 24 → installs `tianshu-harness` globally (npmmirror registry by default; override via `NPM_CONFIG_REGISTRY`) → launches `tianshu`; idempotent, safe to re-run:
 
@@ -593,7 +593,7 @@ The desktop app builds a visual interaction layer on top of the TUI's full capab
 - **Adaptive sidecar memory** — heap cap auto-tiers by machine RAM (8G→2G / 16G→4G / 32G→6G / 64G+→8G; override via `RIVET_SIDECAR_HEAP_MB`); machines with ≤8GB auto-enable the lean resource tier.
 - **Watchdog auto-recovery** — auto-continues on boundary stalls; the desktop timeline shows recovery events (⟳ auto-recover / ⏹ quota exhausted).
 - **Multi-session concurrency** — a tab bar manages multiple sessions, each with its own cwd + model + approval mode.
-- **WSL connected runtime** (Windows) — one click to connect to the runtime running inside WSL; sessions, file access and command execution all happen on the Linux side. Disconnecting cleans up the WSL-side process automatically. The two sides upgrade independently — see the [Desktop User Guide](docs/desktop-guide.md).
+- **WSL connected runtime** (Windows) — one click to connect to the runtime running inside WSL; sessions, file access and command execution all happen on the Linux side. Disconnecting cleans up the WSL-side process automatically. The two sides upgrade independently — see the [Desktop User Guide](docs/desktop-guide.md) (deprecated, it documents the legacy desktop app; current build status is tracked in [client/README.md](client/README.md)).
 - **Feature panels** (left rail `⌘1…9` to switch): Mission Control (multi-session console), Inbox, Automations (scheduled tasks), Skills / Hooks management, Git / GitHub, Changes (diff review), Delegation (fleet tree & team-wave DAG), Cockpit.
 - **Popout window** — pop a single conversation thread into its own window for multi-screen parallel work.
 - **JobsDock / TodoDock** — a persistent background-task dock (expand logs / kill / open in terminal) and a cross-tab persistent todo dock.
@@ -619,7 +619,7 @@ The desktop app builds a visual interaction layer on top of the TUI's full capab
 | `Shift+Tab` | Plan / Agent mode toggle |
 | `Esc Esc` | Rewind (desktop time-travel) |
 
-> The desktop app also has Cockpit, SideChat (⌘;), Rewind time-travel, themes/Glass/wallpaper, Mirror acceleration, and other exclusive features — see the [Desktop User Guide](docs/desktop-guide.md).
+> The desktop app also has Cockpit, SideChat (⌘;), Rewind time-travel, themes/Glass/wallpaper, Mirror acceleration, and other exclusive features — see the [Desktop User Guide](docs/desktop-guide.md) (deprecated; what the current `client/` build actually covers is tracked in [client/README.md](client/README.md)).
 
 ### 📱 Mobile Remote
 
@@ -646,7 +646,7 @@ The composer's microphone button supports voice input on **both macOS and Window
 - Recognition is fully local; recordings never leave the device.
 - Click once to start recording, click again to stop and transcribe.
 - When the local engine is unavailable (e.g. model not downloaded), macOS falls back to the system speech recognizer; Windows shows a model-not-ready hint instead.
-- For higher accuracy, switch to the base model (~244MB): pre-download with `desktop/scripts/fetch-whisper-runtime.js --with-base`.
+- For higher accuracy, switch to the base model (~244MB): the pre-download script lives in the legacy desktop build tree and is **not in this repo**, so this step cannot be run from here.
 - On restricted networks, set `RIVET_WHISPER_PROXY=http://proxy:port` to accelerate model downloads.
 
 
@@ -1040,7 +1040,7 @@ Write only the fields you want to override; defaults are deep-merged. Full schem
 | Doc | Description |
 |-----|-------------|
 | [`docs/user-guide.md`](docs/user-guide.md) | Install, configure, and usage guide |
-| [`docs/desktop-guide.md`](docs/desktop-guide.md) | Desktop user guide (Cockpit/SideChat/Rewind/themes/Mirror exclusives) |
+| [`docs/desktop-guide.md`](docs/desktop-guide.md) | Legacy desktop guide (deprecated — the current client lives in `client/`, see [client/README.md](client/README.md)) |
 | [`docs/user-guide-provider-config.md`](docs/user-guide-provider-config.md) | Model provider configuration guide |
 | [`docs/user-guide-vision.md`](docs/user-guide-vision.md) | Vision channel: configuration and troubleshooting |
 | [`docs/user-guide-sandbox-permissions.md`](docs/user-guide-sandbox-permissions.md) | Full sandbox & permission model guide |

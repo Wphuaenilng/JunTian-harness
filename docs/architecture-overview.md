@@ -126,7 +126,7 @@ WorkerProfile + WorkOrder → 独立无头会话；按任务类型自适应路�
 | 表面 | 路径 | 说明 |
 |------|------|------|
 | TUI | `src/tui/` | 纯 ANSI 引擎；SteerBuffer 承接流式中输入 |
-| Desktop | `desktop/` | Tauri；经 `src/server/` 会话池与 SSE |
+| Desktop | `client/` | 本仓自研（`apps/web` + `apps/desktop` + `packages/ui-*`）；经 `src/server/` 会话池与 SSE |
 | VS Code/Cursor 插件 | `vscode-extension/` | 同 sidecar 通道；E4 客户端工具委托（原生 diff/可见终端）+ 自包含运行时自举。见 `docs/VSCODE-EXTENSION-RELEASE.md` |
 | Headless | `rivet -p` | 脚本 / CI |
 | MCP | `src/mcp/` | 外部工具以 `mcp__*` 进入同一审批链 |
@@ -153,7 +153,7 @@ WorkerProfile + WorkOrder → 独立无头会话；按任务类型自适应路�
 | `src/context/` | 69 | 30 | 认知状态 |
 | `src/api/` | 51 | 22 | 模型接入 |
 | `src/prompt/` | 49 | 18 | 提示词与缓存锚 |
-| `desktop/` | — | 204 | GUI 表面 |
+| `client/` | — | — | GUI 表面（本仓自研；规模以 `git ls-files client` 现数，本表不抄第二份） |
 
 ## 相关文档
 

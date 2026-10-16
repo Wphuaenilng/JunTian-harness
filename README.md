@@ -58,7 +58,7 @@ Application / TUI / IDE / Desktop
 ```
 
 - **稳定交付，不虚报完成** —— 这是核心。任务契约（TaskContract）钉住全局目标，交付门禁要求「完成」必须带运行时证据（测试、diff、验证命令），收敛检测独立判断认知轨迹是否还在推进——模型说完成 ≠ 运行时确认完成。
-- **终端 × 桌面，一个内核** —— 纯 ANSI 自研 TUI（`tianshu`）与 Tauri 桌面端（macOS / Windows / Linux）共用同一 agent 内核，两端能力一致。
+- **终端 × 桌面，一个内核** —— 纯 ANSI 自研 TUI（`tianshu`）与 `client/` 桌面端（Web + Electron 壳，本仓自研）共用同一 agent 内核，两端能力一致。
 - **认知虚拟机（CVM）** —— 75 个运行时 hook 横跨 5 大阶段，在模型输出与真实动作之间加一层可观测、可纠偏的认知运行时（[理念文档](docs/reference/cvm-cognitive-runtime.md) · [A/B 实证](docs/CVM运行时对Agent模型的实证影响.md)）。
 - **前缀缓存引擎，全模型适用** —— 冻结前缀 + 增量 appendix + 边界压缩，对所有支持前缀缓存的模型生效：各家模型长会话实测稳态命中率均在 **95–99%**（DeepSeek V4 另有针对性优化），显著降低 token 成本。
 
@@ -87,45 +87,15 @@ Application / TUI / IDE / Desktop
 
 ## 🚀 快速开始
 
-两条路。桌面端下载安装包，打开就能用，不需要先装 Node。终端 CLI 要求 **Node.js ≥ 24**。
+两条路。终端 CLI 要求 **Node.js ≥ 24**。桌面端在本仓 `client/` 自研，安装包尚未发布，只能从源码跑。
 
 ### 桌面端
 
-安装包在 [GitHub Releases](https://github.com/Wphuaenilng/JunTian-harness/releases/latest)。macOS、Windows、Linux 用的是同一个 agent 内核。
+桌面端在本仓 `client/`：`apps/web`（Web 端）+ `apps/desktop`（Electron 壳）+ `packages/ui-*` 等组件包，经 `src/server/` sidecar 用 HTTP/SSE 驱动与 CLI 同一个 agent 内核。
 
-**macOS**（11 及以上，Apple Silicon 与 Intel 各一包）
+**安装包尚未发布**：桌面端暂时只能从源码跑。构建与启动步骤、门禁清单与已知边界都写在 [client/README.md](client/README.md)——本文件不重抄命令，也不写「当前有几个 Release」这种会过期的数。
 
-下载 `.dmg`，打开后把 `Tianshu` 拖进「应用程序」。
-
-首次打开如果系统说应用已损坏，包本身没坏。当前 macOS 包是 ad-hoc 签名，还没有 Apple 公证，Gatekeeper 会拦截浏览器下载的应用。拖进「应用程序」后，在终端执行一次：
-
-```bash
-xattr -cr /Applications/Tianshu.app
-```
-
-之后正常双击打开。应用内自动更新不受这条限制。
-
-**Windows**（Windows 10 1809 及以上，建议 22H2；或 Windows 11）
-
-下载 `.exe` 安装向导，按提示安装。界面依赖 WebView2 Runtime（建议 120 及以上）。3.5.3 起安装器自带离线安装包，安装时不需要再联网下载运行时。
-
-窗口完全打不开时，用开始菜单里的「修复 WebView2」，或从同一 Release 的 `windows-repair` 目录双击 `repair-webview2.cmd`。也可以手动安装 [WebView2 离线安装包](https://go.microsoft.com/fwlink/p/?LinkId=2124703) 后重启。
-
-**Linux**（x86_64 与 aarch64，3.26.0 起双架构）
-
-下载 AppImage，免安装。按机器架构选包：
-
-- `Tianshu_*_amd64.AppImage`：x86_64 台式机和笔记本
-- `Tianshu_*_aarch64.AppImage`：ARM64（树莓派 64 位、ARM Linux 笔记本）
-
-```bash
-chmod +x Tianshu_*.AppImage
-./Tianshu_*.AppImage
-```
-
-需要 glibc 2.35 及以上（Ubuntu 22.04+、Debian 12+ 等），以及系统图形库 `libwebkit2gtk-4.1` 和 `libgtk-3`。多数桌面发行版已经带这套库。精简系统缺库时，按发行版安装 webkit2gtk 4.1，再用 `ldd Tianshu_*.AppImage` 看还缺什么。推荐 X11 会话（Wayland 尚未验证）。
-
-各平台的完整边界、语音输入和自动更新见 [安装与平台说明](docs/guides/installation.md)。
+各平台的完整边界、语音输入与自动更新见 [安装与平台说明](docs/guides/installation.md)。旧版桌面端的用户指南 [docs/desktop-guide.md](docs/desktop-guide.md)（deprecated，已停止维护）保留作历史，不再是现行入口。
 
 ### 终端（CLI）
 
@@ -251,7 +221,7 @@ CVM 不改权重、不让模型变成确定性程序，而是在概率认知之�
 |------|------|
 | `src/` 源码 | 约 1,256 文件 / 30 万行（最大的 `agent/` 有 483 个文件） |
 | `src/` 测试 | 约 1,592 文件 / 31 万行（node:test，与源码约 1:1） |
-| `desktop/src` | 约 450 文件 / 9.6 万行（React），另有约 1.1 万行 Rust |
+| `client/` 桌面端（本仓自研） | 规模以 `git ls-files client` 现数——本表不抄第二份，抄一次就漂一次 |
 | `vscode-extension/src` | 17 文件 / 约 2,700 行 |
 | 仓库 | 2026-05-15 创建，至今约 4 个半月，共 8,008 个提交，近 30 天 1,769 个 |
 
@@ -295,8 +265,8 @@ CVM 不改权重、不让模型变成确定性程序，而是在概率认知之�
 - **LSP 深度集成** —— 自研 JSON-RPC 客户端接入语言服务器（TypeScript / Python / Go / Rust / C / C++ / Java / C# / Kotlin / Swift / PHP / Ruby / Lua / Dart / Zig / Scala / Shell / Terraform / Vue / Svelte 等 20+ 种，本机装了才启用、缺失静默降级）：跳转定义与查找引用成为 agent 工具，编辑后诊断自动注入回环——改出类型错误模型立刻看见。
 - **MCP 与 Skills** —— 外部工具服务器接入 + 可复用工作流剧本，渐进披露。[细节](docs/user-guide.md#mcpmodel-context-protocol)
 - **T9 自研 TUI** —— 纯 ANSI 零依赖：GlanceBar 状态栏、流式中打断、命令面板、Cockpit 驾驶舱、内联图片。[细节](docs/user-guide.md#终端-uitui)
-- **桌面端增强** —— 集成终端、主题工作室、语音输入（本地 whisper）、手机遥控审批、多会话并发。[桌面端指南](docs/desktop-guide.md)
-- **WSL 连接式运行时**（Windows）—— 一键连上 WSL 内的运行时，会话、文件读写与命令执行都在 Linux 侧进行；断开自动清理，两侧版本独立升级互不影响。[细节](docs/desktop-guide.md#wsl-连接式运行时windows)
+- **桌面端增强（旧版桌面端；现行桌面端在本仓 `client/`）** —— 集成终端、主题工作室、语音输入（本地 whisper）、手机遥控审批、多会话并发。[桌面端指南](docs/desktop-guide.md)（deprecated）
+- **WSL 连接式运行时**（Windows）—— 一键连上 WSL 内的运行时，会话、文件读写与命令执行都在 Linux 侧进行；断开自动清理，两侧版本独立升级互不影响。[细节](docs/desktop-guide.md#wsl-连接式运行时windows)（deprecated，描述的是旧版桌面端；现行构建的实现状态见 [client/README.md](client/README.md)）
 - **Lean 资源档** —— 低内存/低磁盘场景的精简工具集与会话池收紧，可按星域覆盖。[细节](docs/user-guide.md#lean-资源档低内存--低磁盘)
 
 ## 🔐 权限模式
@@ -335,7 +305,7 @@ CVM 不改权重、不让模型变成确定性程序，而是在概率认知之�
 |------|------|
 | [用户手册](docs/user-guide.md) | 斜杠命令全表、TUI 键位、特性细节、配置文件与环境变量、日志排查 |
 | [安装与平台说明](docs/guides/installation.md) | 四种安装路径、Windows/Linux/Termux 注意事项、Shell 补全、自动更新 |
-| [桌面端用户指南](docs/desktop-guide.md) | Cockpit / SideChat / Rewind / 主题工作室 / 语音输入 / 快捷键 |
+| [桌面端用户指南](docs/desktop-guide.md) | 旧版桌面端的 Cockpit / SideChat / Rewind / 主题工作室 / 语音输入 / 快捷键（deprecated；现行入口见 [client/README.md](client/README.md)） |
 | [Provider 配置手册](docs/user-guide-provider-config.md) | 多提供商、自定义端点、子代理/审查模型路由、生图 |
 | [权限与沙箱指南](docs/user-guide-sandbox-permissions.md) | 权限规则、路径授权、沙箱模型、故障排查 |
 | [识图能力手册](docs/user-guide-vision.md) | 视觉通道配置与排查 |

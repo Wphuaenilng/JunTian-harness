@@ -97,7 +97,8 @@ npm run docs:check   # 校验 frontmatter 合法性 + 文档卫生检查（只�
 - **[docs.json](docs.json)** — 机读索引，供脚本/工具消费（如"列出所有 status=active 的 plan"）
 - **[MINDMAP.md](MINDMAP.md)** — 思维导图大纲。VSCode markmap 插件直接打开，或 `npx markmap-cli docs/MINDMAP.md` 渲染成交互式 HTML；每个分组仅展开最近 20 篇防爆炸
 
-三件套已提交进仓库方便 GitHub 浏览；内容过期时跑 `npm run docs:index` 重建即可，不要手工编辑（文件头有生成标记）。
+三件套已提交进仓库方便 GitHub 浏览；内容过期时跑 `npm run docs:index` 重建即可——**前提是这份检出带着完整文档树**。任何时候都不要手工编辑它们（文件头有生成标记）。
+- **子集检出不许重建索引（2026-10-16 现测）**：本工作副本的 `docs/` 是完整文档树的子集——索引自称 1035 篇，盘上只有 358 个 `.md`。在这种检出上跑 `npm run docs:index` 会把三件套重写成盘上的量（实测只剩 190 篇、`docs.json` 一次掉 11817 行条目），而生成器对这种覆盖不足**只打印警告、不拦**。要验引用完整性用 `npm run docs:check`（它按"未随本仓分发"tolerate 这类缺口，现测 exit 0）。新文档要进索引，请在完整树上重建；否则就明确接受该条目暂不入索引，别手改构建产物。
 
 ## 归档规则
 

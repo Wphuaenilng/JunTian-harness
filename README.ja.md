@@ -137,7 +137,7 @@ Layer 4: RuntimeHookPipeline（75 hooks）→ trap-and-emulate で退化行動�
 |------|------|
 | `src/` ソース（TypeScript、テスト除く） | 約 1,256 ファイル / 30 万行（最大の `agent/` は 483 ファイル） |
 | `src/` テスト | 約 1,592 ファイル / 31 万行（node:test、ソースと約 1:1） |
-| `desktop/src` | 約 450 ファイル / 9.6 万行（React）、別途 Rust 約 1.1 万行 |
+| `client/` デスクトップ（本仓自研） | 規模は `git ls-files client` で現数——この表に第二の写しは置かない |
 | `vscode-extension/src` | 17 ファイル / 約 2,700 行 |
 | 累計コミット | **8,008**（2026-05-15 作成、約 4.5 か月；直近 30 日で 1,769） |
 | 型チェック | `tsc` strict + `noUncheckedIndexedAccess` |
@@ -154,11 +154,8 @@ Layer 4: RuntimeHookPipeline（75 hooks）→ trap-and-emulate で退化行動�
 
 ### 2. インストール（いずれかを選択）
 
-**方法 A：デスクトップ版（すぐ使える）** —— [GitHub Releases](https://github.com/Wphuaenilng/JunTian-harness/releases/latest) からダウンロード：macOS `.dmg`（Apple Silicon / Intel 両アーキテクチャ）· Windows `.exe` インストールウィザード · Linux `.AppImage`。
-> **Linux サポート範囲（3.11.2 初出）**：x64 AppImage はインストール不要——`chmod +x Tianshu_*.AppImage` で直接実行。glibc ≥ 2.35 が必要（Ubuntu 22.04+ / Debian 12+ など主要ディストリビューション）。X11 セッション推奨（Wayland は未検証）。既知の制限：音声入力は当面利用不可（whisper コミュニティビルドが無いため、ブラウザ音声に自動フォールバック）。デスクトップの自動更新は Linux でも有効。
-
-> **Windows サポート範囲**：Windows 10（1809+、22H2 推奨）/ Windows 11。画面描画は **WebView2 Runtime（推奨 ≥ 120）** に依存——v3.5 以降のスクロール・描画最適化には新しいランタイムが必要で、古いとセッション領域のスクロールがカクつきます。3.5.3 以降インストーラーは完全なオフラインインストールパッケージを同梱（ネット不要・システムレベル登録）。既存ユーザーが自動更新で古すぎる旨の表示が出た場合：通知バーまたは「設定 → ランタイムとバージョン情報」で「修復ツールを実行」。**ウィンドウが完全に開かない**場合は、スタートメニューの「WebView2 を修復」、または [Releases](https://github.com/Wphuaenilng/JunTian-harness/releases/latest) の `windows-repair` ディレクトリから `repair-webview2.cmd` をダブルクリック。[WebView2 オフラインインストールパッケージ](https://go.microsoft.com/fwlink/p/?LinkId=2124703) を手動インストールして再起動しても構いません。
-> **Win10 タブレットモードの既知動作**：タブレットモードでアプリを切り替えると前のアプリが画面外へスライドします——computer_use のスナップショットは遮へい／バックグラウンド自己修復（PrintWindow 描画）済みで、タブレットモードを切る必要はありません。
+**方法 A：デスクトップ版 —— インストーラーは未公開** —— デスクトップ版は今この倉庫の `client/`（`apps/web` + `apps/desktop` + `packages/ui-*`）で開発中で、`src/server/` の sidecar を HTTP/SSE で通して CLI と同じ agent カーネルを動かします。したがって現状はソースから起動するしかありません。ビルド手順・ゲート・既知の境界は [client/README.md](client/README.md) に書き、ここでは重複しません。「今 Release がいくつあるか」のような数はすぐ古くなるので置いていません。
+> 旧ガイド [`docs/desktop-guide.md`](docs/desktop-guide.md)（deprecated）は履歴として残し、現行の入口にはしません。
 
 **方法 B：ワンラインインストールスクリプト（推奨）** —— Node ≥ 24 を検証 → `tianshu-harness` をグローバルインストール（デフォルトは npmmirror ミラー加速、`NPM_CONFIG_REGISTRY` で上書き可）→ `tianshu` を起動。冪等で再実行可能：
 
@@ -608,7 +605,7 @@ TUI は CLI のデフォルトサーフェスです。デスクトップ版（Ta
 - **sidecar メモリ適応**：ヒープ上限をマシンメモリで自動段階分け（8G→2G / 16G→4G / 32G→6G / 64G+→8G、`RIVET_SIDECAR_HEAP_MB` で上書き可）。≤8GB マシンは自動で lean リソースセットを有効化
 - **watchdog 自動復旧**：境界での停滞時に自動で続行。デスクトップ版のタイムラインに復旧イベントを表示（⟳ 自動復旧 / ⏹ クォータ枯渇）
 - **マルチセッション並行**：タブバーで複数セッションを管理。それぞれ独立した cwd＋モデル＋承認モード
-- **WSL 接続ランタイム**（Windows）：ワンクリックで WSL 内で動作するランタイムに接続。セッション・ファイル読み書き・コマンド実行がすべて Linux 側で行われます。切断時は WSL 側プロセスを自動クリーンアップ。両側は独立してアップグレードできます——詳細は [デスクトップユーザーガイド](docs/desktop-guide.md) を参照。
+- **WSL 接続ランタイム**（Windows）：ワンクリックで WSL 内で動作するランタイムに接続。セッション・ファイル読み書き・コマンド実行がすべて Linux 側で行われます。切断時は WSL 側プロセスを自動クリーンアップ。両側は独立してアップグレードできます——詳細は [デスクトップユーザーガイド](docs/desktop-guide.md)（deprecated、旧デスクトップ版の記述）を参照。現行ビルドの実装状況は [client/README.md](client/README.md) に。
 - **機能パネル**（左サイドバー `⌘1…9` で切替）：Mission Control（マルチセッションコンソール）、Inbox（受信トレイ）、Automations（定期タスク）、Skills / Hooks 管理、Git / GitHub、Changes（変更レビュー）、Delegation（委譲艦隊とチーム波次 DAG）、Cockpit コックピット
 - **Popout 独立ウィンドウ**：単一のセッションスレッドを独立ウィンドウに分離し、マルチディスプレイで並行
 - **JobsDock / TodoDock 常駐ドロワー**：バックグラウンドタスクのドッキングバー（ログ展開 / Kill / ターミナルで開く）、タブ横断の常駐 todo
@@ -634,7 +631,7 @@ TUI は CLI のデフォルトサーフェスです。デスクトップ版（Ta
 | `Shift+Tab` | Plan / Agent モード切替 |
 | `Esc Esc` | 巻き戻し（デスクトップ版 Rewind） |
 
-> デスクトップ版には他にも Cockpit コックピット、SideChat サイド質問（⌘;）、Rewind タイムトラベル、テーマ/Glass/壁紙、Mirror ミラー加速などの独自機能があります——詳細は [デスクトップユーザーガイド](docs/desktop-guide.md) を参照。
+> デスクトップ版には他にも Cockpit コックピット、SideChat サイド質問（⌘;）、Rewind タイムトラベル、テーマ/Glass/壁紙、Mirror ミラー加速などの機能があります——詳細は [デスクトップユーザーガイド](docs/desktop-guide.md)（deprecated）を参照。現行ビルドが実際にカバーする範囲は [client/README.md](client/README.md) に。
 
 ### 📱 モバイルリモート（Mobile Remote）
 
@@ -661,7 +658,7 @@ TUI は CLI のデフォルトサーフェスです。デスクトップ版（Ta
 - 認識はすべてローカルで完了し、録音がデバイスを離れることはありません。
 - 1 回クリックで録音開始、もう 1 回クリックで終了して認識。
 - ローカルエンジンが使えないとき（モデル未ダウンロード等）は、macOS はシステム音声認識に自動フォールバック。Windows はモデル未準備の旨を通知。
-- より高精度を求めるなら base モデル（約 244MB）に変更可：`desktop/scripts/fetch-whisper-runtime.js --with-base` で事前ダウンロード。
+- より高精度を求めるなら base モデル（約 244MB）に変更可：ただし事前ダウンロード用スクリプトは旧デスクトップ構築側にあり **本仓に含まれない** ため、ここでは実行できない。
 - ネットワーク制限環境では `RIVET_WHISPER_PROXY=http://プロキシ:ポート` でモデルダウンロードを加速。
 
 ### ⚡ Lean リソースセット（低メモリ / 低ディスク）
@@ -1151,7 +1148,7 @@ tianshu logs open desktop            # sidecar ログディレクトリを開く
 | ドキュメント | 説明 |
 |------|------|
 | [`docs/user-guide.md`](docs/user-guide.md) | インストール、設定、利用ガイド |
-| [`docs/desktop-guide.md`](docs/desktop-guide.md) | デスクトップ版ユーザーガイド（Cockpit/SideChat/Rewind/テーマ/Mirror などの独自機能） |
+| [`docs/desktop-guide.md`](docs/desktop-guide.md) | 旧デスクトップ版ユーザーガイド（deprecated — 現行の実装は `client/`、手順は [client/README.md](client/README.md)） |
 | [`docs/user-guide-provider-config.md`](docs/user-guide-provider-config.md) | モデルプロバイダー設定ガイド |
 | [`docs/user-guide-vision.md`](docs/user-guide-vision.md) | 画像認識能力（ビジュアルチャネル）の設定と調査 |
 | [`docs/user-guide-sandbox-permissions.md`](docs/user-guide-sandbox-permissions.md) | サンドボックスと権限モデルの完全ガイド |

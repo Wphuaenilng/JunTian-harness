@@ -1,8 +1,9 @@
 # Credits ledger（署名台账）
 
-本文件是**公开仓那份台账**的初始骨架：dev 仓这份不再随 sync 覆盖公开仓——覆盖会把公开仓
-累积的台账打回骨架、触发 credit 台账提交全量重放（见 `scripts/sync-to-public.sh` 里
-CREDITS.md 附近的注释）。台账正文由 `scripts/credit-contributors.sh` 在公开仓逐 PR 追加。
+本文件是**唯一一份署名台账**——本仓就是那份公开台账，不存在"另一份被 sync 覆盖的副本"这套前提。
+两条相关脚本实测都不在本仓（工作树与 HEAD 皆无）：`scripts/sync-to-public.sh`、
+`scripts/credit-contributors.sh`。所以逐 PR 自动落账这条路当前没有对应制品，台账条目只能逐条手工维护；
+要把自动落账接回来，先把脚本收进本仓，再改这一段指向真存在的文件。
 
 **为什么需要它**：GitHub 仓库的 Contributors 面板只统计「**非空提交 + 提交的 author 字段
 是本人账号关联邮箱**」——空提交与 `Co-authored-by` 都不计入（依据 GitHub 文档

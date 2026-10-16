@@ -17,20 +17,13 @@ related: [../user-guide.md, troubleshooting.md]
 - **Node.js ≥ 24**（`engines` 钉定）—— 用 `node --version` 检查。低版本 npm 安装时仅告警但不在支持范围；一键安装脚本会直接拦截并给出升级指引。
 - **Git**（强烈建议）—— 可选。没有它天枢仍可运行（就地修改），但 git 能解锁：委派 worktree 隔离、检查点回滚、`commit`/`diff` 审查、每个 worker 的 diff 审查。安装：<https://git-scm.com/downloads>。
 
-## 方式 A：桌面端（开箱即用）
+## 方式 A：桌面端（从源码跑）
 
-从 [GitHub Releases](https://github.com/Wphuaenilng/JunTian-harness/releases/latest) 下载：macOS `.dmg`（Apple Silicon / Intel 双架构）· Windows `.exe` 安装向导 · Linux `.AppImage`（**x86_64 / aarch64 双架构**，3.26.0 起）。
+桌面端在本仓 `client/`：`apps/web`（Web 端）+ `apps/desktop`（Electron 壳）+ `packages/ui-*` 组件包，经 `src/server/` 的 sidecar 用 HTTP/SSE 驱动与 CLI 同一个 agent 内核。
 
-> **macOS 首次打开报「已损坏」**：当前 macOS 包为 ad-hoc 签名、未经 Apple 公证，浏览器下载后会被 Gatekeeper 拦截。把 app 拖进「应用程序」后执行一次即可（移除下载隔离属性）：
-> ```bash
-> xattr -cr /Applications/Tianshu.app
-> ```
-> 应用内自动更新不受此影响。
+**安装包尚未发布**：桌面端暂时只能从源码跑——构建与启动步骤、门禁清单与已知边界见 [../../client/README.md](../../client/README.md)。本文件不重抄命令，也不写「当前有几个 Release」这种会过期的数。
 
-> **Linux 支持范围（3.11.2 首发，3.26.0 起双架构）**：AppImage 免安装——`chmod +x Tianshu_*.AppImage` 后直接运行。按架构选包：`Tianshu_*_amd64.AppImage`（x86_64 台式机/笔记本）· `Tianshu_*_aarch64.AppImage`（ARM 设备：树莓派 64 位、ARM Linux 笔记本等）。要求 glibc ≥ 2.35（Ubuntu 22.04+ / Debian 12+ 等主流发行版）与**系统图形栈** `libwebkit2gtk-4.1.so.0` + `libgtk-3.so.0`——AppImage 不再自带图形库（自带旧 GLib 与宿主新 pango 混用，会在 Arch/Fedora 一类滚动发行版上启动即崩），多数桌面发行版默认已有这套库，精简/服务器版需按发行版安装 webkit2gtk 4.1；缺库时应用起不来，可用 `ldd Tianshu_*.AppImage` 自查缺失项。推荐 X11 会话（Wayland 未验证）。语音输入自下一个版本起可用（随包自带 whisper.cpp 官方 Linux 构建、本地离线识别；3.26.0 及更早版本该能力缺位，语音会降级到浏览器识别）；桌面自动更新对 Linux 同样生效。
-
-> **Windows 支持范围**：Windows 10（1809+，建议 22H2）/ Windows 11。界面渲染依赖 **WebView2 Runtime（建议 ≥ 120）**——v3.5 起的滚动与渲染优化需要较新运行时，旧版会导致会话区滚动卡顿。自 3.5.3 起安装器内嵌完整离线安装包（无需联网、系统级注册）。存量用户经自动更新升级后若提示过旧：在提示条或「设置 → 运行时与关于」里点「运行修复工具」。**窗口完全打不开**时，用开始菜单「修复 WebView2」，或从 [Releases](https://github.com/Wphuaenilng/JunTian-harness/releases/latest) 下载 `windows-repair` 目录双击 `repair-webview2.cmd`。也可手动安装 [WebView2 离线安装包](https://go.microsoft.com/fwlink/p/?LinkId=2124703) 后重启。
-> **Win10 平板模式已知行为**：平板模式下切换应用会把上一个应用滑出屏幕——computer_use 的快照已做遮挡/后台自愈（PrintWindow 渲染），无需关闭平板模式。
+> 旧版桌面端各平台的安装包注意事项（macOS Gatekeeper 与 `xattr -cr`、Linux AppImage 免装、Windows WebView2 与平板模式）随旧交付链一起停用。照那些步骤做，是在改一个**本仓发不出来的应用**的系统属性，所以从本手册移除；相关记载仍留在 `docs/releases/` 的各版本说明里，不删档。自动更新链目前同样没有可用产物，口径见 `docs/decisions/0001-单仓与全栈自主可控.md`。
 
 ## 方式 B：一键安装脚本（推荐）
 

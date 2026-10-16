@@ -1,3 +1,13 @@
+---
+title: 桌面端用户指南（旧版桌面端，已停止维护）
+type: guide
+status: deprecated
+date: 2026-07-26
+updated: 2026-10-16
+tags: [desktop, legacy]
+---
+
+> **本指南已过时**：它描述的是旧版桌面端。现行桌面端在本仓 `client/`，构建步骤、门禁与已知边界见 [../client/README.md](../client/README.md)。以下正文原样保留作历史，不再更新。
 # 桌面端用户指南
 
 > 适用于天枢桌面端（Tauri）。CLI 命令仍为 `rivet`，桌面端经 sidecar HTTP/SSE 驱动同一 agent 内核——本指南只讲桌面端独有的 UI、配置入口与交互模型。通用概念（Provider 配置、审查纪律、沙箱权限）见对应的 CLI 用户手册。
